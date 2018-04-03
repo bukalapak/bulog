@@ -32,6 +32,7 @@ func TestOutput(t *testing.T) {
 	for k, v := range m {
 		t.Run(k, func(t *testing.T) {
 			w := newOutput()
+			w.Format = bulog.None
 			l := log.New(w, "", 0)
 
 			for i := range v[0] {
@@ -42,7 +43,39 @@ func TestOutput(t *testing.T) {
 			x := strings.Join(v[1], "\n") + "\n"
 
 			if s != x {
-				t.Fatalf("\nactual: %s\nexpected: %s", s, x)
+				t.Fatalf("\nactual: %q\nexpected: %q", s, x)
+			}
+		})
+	}
+}
+
+func TestOutput_Fmt(t *testing.T) {
+	m := map[string][][]string{
+		"SkipLevel": [][]string{
+			[]string{"[INFO] info", "[DEBUG] debug"},
+			[]string{`level=INFO msg="info"`},
+		},
+		"WithMetadata": [][]string{
+			[]string{`[INFO] info foo="bar" num=8`},
+			[]string{`level=INFO foo="bar" num=8 msg="info"`},
+		},
+	}
+
+	for k, v := range m {
+		t.Run(k, func(t *testing.T) {
+			w := newOutput()
+			w.Format = bulog.Logfmt
+			l := log.New(w, "", 0)
+
+			for i := range v[0] {
+				l.Println(v[0][i])
+			}
+
+			s := w.Writer.(*bytes.Buffer).String()
+			x := strings.Join(v[1], "\n") + "\n"
+
+			if s != x {
+				t.Fatalf("\nactual: %q\nexpected: %q", s, x)
 			}
 		})
 	}

@@ -4,13 +4,22 @@ import (
 	"bytes"
 	"io"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
+)
+
+type Format int8
+
+const (
+	None Format = iota
+	Logfmt
 )
 
 type Output struct {
 	Levels     []string
 	MinLevel   string
+	Format     Format
 	Writer     io.Writer
 	skipLevels map[string]struct{}
 	pattern    *regexp.Regexp
@@ -67,6 +76,11 @@ func extractLevel(line []byte) (level string) {
 }
 
 func (w *Output) formatLine(level string, line []byte) []byte {
+	switch w.Format {
+	case Logfmt:
+		return w.formatLineFmt(level, line)
+	}
+
 	return w.formatLineNone(level, line)
 }
 
@@ -75,8 +89,7 @@ func (w *Output) formatLineNone(level string, line []byte) []byte {
 		return append([]byte("["+level+"] "), line...)
 	}
 
-	var b bytes.Buffer
-
+	b := new(bytes.Buffer)
 	b.WriteString("[" + level + "]")
 
 	for _, submatches := range w.pattern.FindAllSubmatch(line, -1) {
@@ -86,6 +99,24 @@ func (w *Output) formatLineNone(level string, line []byte) []byte {
 
 	b.WriteString(" ")
 	b.Write(w.extractMessage(line))
+	b.WriteString("\n")
+
+	return b.Bytes()
+}
+
+func (w *Output) formatLineFmt(level string, line []byte) []byte {
+	b := new(bytes.Buffer)
+	b.WriteString("level=" + level)
+
+	if w.pattern.Match(line) {
+		for _, submatches := range w.pattern.FindAllSubmatch(line, -1) {
+			b.WriteString(" ")
+			b.Write(submatches[0])
+		}
+	}
+
+	b.WriteString(" ")
+	b.Write(strconv.AppendQuote([]byte(`msg=`), string(w.extractMessage(line))))
 	b.WriteString("\n")
 
 	return b.Bytes()

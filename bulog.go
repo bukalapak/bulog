@@ -14,7 +14,7 @@ import (
 type Format int8
 
 const (
-	None Format = iota
+	Basic Format = iota
 	Logfmt
 	JSON
 )

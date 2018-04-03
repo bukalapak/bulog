@@ -32,7 +32,7 @@ func TestOutput(t *testing.T) {
 	for k, v := range m {
 		t.Run(k, func(t *testing.T) {
 			w := newOutput()
-			w.Format = bulog.None
+			w.Format = bulog.Basic
 			l := log.New(w, "", 0)
 
 			for i := range v[0] {

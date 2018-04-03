@@ -3,6 +3,7 @@ package bulog
 import (
 	"bytes"
 	"io"
+	"regexp"
 	"strings"
 	"sync"
 )
@@ -12,6 +13,7 @@ type Output struct {
 	MinLevel   string
 	Writer     io.Writer
 	skipLevels map[string]struct{}
+	pattern    *regexp.Regexp
 	once       sync.Once
 }
 
@@ -24,7 +26,7 @@ func (w *Output) Write(line []byte) (n int, err error) {
 		return len(line), nil
 	}
 
-	return w.Writer.Write(normalizeLine(l, z))
+	return w.Writer.Write(w.formatLine(l, z))
 }
 
 func (w *Output) init() {
@@ -38,6 +40,7 @@ func (w *Output) init() {
 	}
 
 	w.skipLevels = levels
+	w.pattern = regexp.MustCompile(`(?P<key>\w+)=(?P<value>[^\s]+)`)
 }
 
 func (w *Output) extractLine(line []byte) (string, []byte) {
@@ -63,6 +66,31 @@ func extractLevel(line []byte) (level string) {
 	return
 }
 
-func normalizeLine(level string, line []byte) []byte {
-	return append([]byte("["+level+"] "), line...)
+func (w *Output) formatLine(level string, line []byte) []byte {
+	return w.formatLineNone(level, line)
+}
+
+func (w *Output) formatLineNone(level string, line []byte) []byte {
+	if !w.pattern.Match(line) {
+		return append([]byte("["+level+"] "), line...)
+	}
+
+	var b bytes.Buffer
+
+	b.WriteString("[" + level + "]")
+
+	for _, submatches := range w.pattern.FindAllSubmatch(line, -1) {
+		b.WriteString(" ")
+		b.Write(submatches[0])
+	}
+
+	b.WriteString(" ")
+	b.Write(w.extractMessage(line))
+	b.WriteString("\n")
+
+	return b.Bytes()
+}
+
+func (w *Output) extractMessage(line []byte) []byte {
+	return bytes.TrimSpace(w.pattern.ReplaceAll(line, []byte("")))
 }

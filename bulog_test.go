@@ -23,6 +23,10 @@ func TestOutput(t *testing.T) {
 			[]string{"[INFO] info", "[DEBUG] debug"},
 			[]string{"[INFO] info"},
 		},
+		"WithMetadata": [][]string{
+			[]string{`[INFO] info foo="bar" num=8`},
+			[]string{`[INFO] foo="bar" num=8 info`},
+		},
 	}
 
 	for k, v := range m {

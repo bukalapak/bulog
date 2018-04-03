@@ -14,6 +14,7 @@ type Format int8
 const (
 	None Format = iota
 	Logfmt
+	JSON
 )
 
 type Output struct {
@@ -75,10 +76,16 @@ func extractLevel(line []byte) (level string) {
 	return
 }
 
+func (w *Output) extractMessage(line []byte) []byte {
+	return bytes.TrimSpace(w.pattern.ReplaceAll(line, []byte("")))
+}
+
 func (w *Output) formatLine(level string, line []byte) []byte {
 	switch w.Format {
 	case Logfmt:
 		return w.formatLineFmt(level, line)
+	case JSON:
+		return w.formatLineJSON(level, line)
 	}
 
 	return w.formatLineNone(level, line)
@@ -122,6 +129,30 @@ func (w *Output) formatLineFmt(level string, line []byte) []byte {
 	return b.Bytes()
 }
 
-func (w *Output) extractMessage(line []byte) []byte {
-	return bytes.TrimSpace(w.pattern.ReplaceAll(line, []byte("")))
+func (w *Output) formatLineJSON(level string, line []byte) []byte {
+	b := new(bytes.Buffer)
+	b.WriteRune('{')
+	b.Write(strconv.AppendQuote([]byte(`"level":`), level))
+	b.WriteString(",")
+	b.Write(strconv.AppendQuote([]byte(`"msg":`), string(w.extractMessage(line))))
+
+	if w.pattern.Match(line) {
+		z := [][]byte{}
+		p := []byte(`"$key":$value`)
+
+		for _, submatches := range w.pattern.FindAllSubmatchIndex(line, -1) {
+			z = append(z, w.pattern.Expand(nil, p, line, submatches))
+		}
+
+		if len(z) != 0 {
+			b.WriteString(",")
+		}
+
+		b.Write(bytes.Join(z, []byte(",")))
+	}
+
+	b.WriteRune('}')
+	b.WriteString("\n")
+
+	return b.Bytes()
 }

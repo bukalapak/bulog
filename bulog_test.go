@@ -25,7 +25,7 @@ func TestOutput(t *testing.T) {
 		},
 		"WithMetadata": [][]string{
 			[]string{`[INFO] info foo="bar" num=8`},
-			[]string{`[INFO] foo="bar" num=8 info`},
+			[]string{`[INFO] info foo=bar num=8`},
 		},
 	}
 
@@ -53,19 +53,23 @@ func TestOutput_Fmt(t *testing.T) {
 	m := map[string][][]string{
 		"SkipLevel": [][]string{
 			[]string{"[INFO] info", "[DEBUG] debug"},
-			[]string{`level=INFO msg="info"`},
+			[]string{`level=INFO msg=info`},
+		},
+		"Output": [][]string{
+			[]string{`[INFO] hello info num=8 foo="bar baz"`},
+			[]string{`level=INFO num=8 foo="bar baz" msg="hello info"`},
 		},
 		"WithMetadata": [][]string{
 			[]string{`[INFO] info foo="bar" num=8`},
-			[]string{`level=INFO foo="bar" num=8 msg="info"`},
+			[]string{`level=INFO foo=bar num=8 msg=info`},
 		},
 		"MsgMetadata": [][]string{
 			[]string{`[INFO] foo="bar" num=8 msg="info"`},
-			[]string{`level=INFO foo="bar" num=8 msg="info"`},
+			[]string{`level=INFO foo=bar num=8 msg=info`},
 		},
 		"SpaceMetadata": [][]string{
 			[]string{`[INFO] foo="bar baz" info`},
-			[]string{`level=INFO foo="bar baz" msg="info"`},
+			[]string{`level=INFO foo="bar baz" msg=info`},
 		},
 	}
 
@@ -96,8 +100,8 @@ func TestOutput_JSON(t *testing.T) {
 			[]string{`{"level":"INFO","msg":"info"}`},
 		},
 		"WithMetadata": [][]string{
-			[]string{`[INFO] info foo="bar" num=8`},
-			[]string{`{"level":"INFO","foo":"bar","num":8,"msg":"info"}`},
+			[]string{`[INFO] info foo="bar" num=8 float=9.99 bool=true`},
+			[]string{`{"level":"INFO","foo":"bar","num":8,"float":9.99,"bool":true,"msg":"info"}`},
 		},
 		"MsgMetadata": [][]string{
 			[]string{`[INFO] foo="bar" num=8 msg="info"`},

@@ -3,10 +3,12 @@ package bulog
 import (
 	"bytes"
 	"io"
-	"regexp"
 	"strconv"
 	"strings"
 	"sync"
+
+	"github.com/buger/jsonparser"
+	"github.com/go-logfmt/logfmt"
 )
 
 type Format int8
@@ -23,7 +25,6 @@ type Output struct {
 	Format     Format
 	Writer     io.Writer
 	skipLevels map[string]struct{}
-	pattern    *regexp.Regexp
 	once       sync.Once
 }
 
@@ -50,7 +51,6 @@ func (w *Output) init() {
 	}
 
 	w.skipLevels = levels
-	w.pattern = regexp.MustCompile(`(?P<key>\w+)=(?P<value>"[\w\s]+?"|[^\s]+)`)
 }
 
 func (w *Output) extractLine(line []byte) (string, []byte) {
@@ -76,10 +76,6 @@ func (w *Output) extractLevel(line []byte) (level string) {
 	return
 }
 
-func (w *Output) extractMessage(line []byte) []byte {
-	return bytes.TrimSpace(w.pattern.ReplaceAll(line, []byte("")))
-}
-
 func (w *Output) formatLine(level string, line []byte) []byte {
 	switch w.Format {
 	case Logfmt:
@@ -92,86 +88,133 @@ func (w *Output) formatLine(level string, line []byte) []byte {
 }
 
 func (w *Output) formatLineNone(level string, line []byte) []byte {
-	if !w.pattern.Match(line) {
-		return append([]byte("["+level+"] "), line...)
-	}
-
 	b := new(bytes.Buffer)
-	b.WriteString("[" + level + "]")
+	d := logfmt.NewDecoder(bytes.NewReader(line))
+	c := logfmt.NewEncoder(b)
 
-	for _, submatches := range w.pattern.FindAllSubmatch(line, -1) {
-		b.WriteString(" ")
-		b.Write(submatches[0])
+	var hasMsg bool
+	var msg [][]byte
+
+	for d.ScanRecord() {
+		for d.ScanKeyval() {
+			if d.Value() != nil {
+				if bytes.Equal(d.Key(), []byte("msg")) {
+					hasMsg = true
+				}
+
+				c.EncodeKeyval(d.Key(), d.Value())
+			} else {
+				msg = append(msg, d.Key())
+			}
+		}
 	}
 
-	b.WriteString(" ")
-	b.Write(w.extractMessage(line))
-	b.WriteString("\n")
+	c.EndRecord()
 
-	return b.Bytes()
+	z := []byte("[" + level + "] ")
+	x := bytes.TrimSpace(b.Bytes())
+
+	if !hasMsg {
+		z = append(z, bytes.Join(msg, []byte(" "))...)
+	}
+
+	if len(x) != 0 {
+		z = append(z, []byte(" ")...)
+		z = append(z, x...)
+	}
+
+	z = append(z, []byte("\n")...)
+
+	return z
 }
 
 func (w *Output) formatLineFmt(level string, line []byte) []byte {
 	b := new(bytes.Buffer)
-	b.WriteString("level=" + level)
+	d := logfmt.NewDecoder(bytes.NewReader(line))
+	c := logfmt.NewEncoder(b)
+	c.EncodeKeyval("level", level)
 
 	var hasMsg bool
+	var msg [][]byte
 
-	if w.pattern.Match(line) {
-		for _, submatches := range w.pattern.FindAllSubmatch(line, -1) {
-			b.WriteString(" ")
-			b.Write(submatches[0])
+	for d.ScanRecord() {
+		for d.ScanKeyval() {
+			if d.Value() != nil {
+				if bytes.Equal(d.Key(), []byte("msg")) {
+					hasMsg = true
+				}
 
-			if bytes.Equal(submatches[1], []byte("msg")) {
-				hasMsg = true
+				c.EncodeKeyval(d.Key(), d.Value())
+			} else {
+				msg = append(msg, d.Key())
 			}
 		}
 	}
 
 	if !hasMsg {
-		b.WriteString(" ")
-		b.Write(strconv.AppendQuote([]byte(`msg=`), string(w.extractMessage(line))))
+		c.EncodeKeyval("msg", bytes.Join(msg, []byte(" ")))
 	}
 
-	b.WriteString("\n")
+	c.EndRecord()
 
 	return b.Bytes()
 }
 
 func (w *Output) formatLineJSON(level string, line []byte) []byte {
-	b := new(bytes.Buffer)
-	b.WriteRune('{')
-	b.Write(strconv.AppendQuote([]byte(`"level":`), level))
+	d := logfmt.NewDecoder(bytes.NewReader(line))
+	b := []byte("{}")
+	b, _ = jsonparser.Set(b, w.quote([]byte(level)), "level")
 
 	var hasMsg bool
+	var msg [][]byte
 
-	if w.pattern.Match(line) {
-		z := [][]byte{}
-		p := []byte(`"$key":$value`)
+	for d.ScanRecord() {
+		for d.ScanKeyval() {
+			if d.Value() != nil {
+				if bytes.Equal(d.Key(), []byte("msg")) {
+					hasMsg = true
+				}
 
-		for _, submatches := range w.pattern.FindAllSubmatchIndex(line, -1) {
-			c := w.pattern.Expand(nil, p, line, submatches)
-			z = append(z, c)
-
-			if bytes.Contains(c, []byte(`"msg":`)) {
-				hasMsg = true
+				b, _ = jsonparser.Set(b, w.autoQuote(d.Value()), string(d.Key()))
+			} else {
+				msg = append(msg, d.Key())
 			}
 		}
-
-		if len(z) != 0 {
-			b.WriteString(",")
-		}
-
-		b.Write(bytes.Join(z, []byte(",")))
 	}
 
 	if !hasMsg {
-		b.WriteString(",")
-		b.Write(strconv.AppendQuote([]byte(`"msg":`), string(w.extractMessage(line))))
+		b, _ = jsonparser.Set(b, w.quote(bytes.Join(msg, []byte(" "))), "msg")
 	}
 
-	b.WriteRune('}')
-	b.WriteString("\n")
+	b = append(b, []byte("\n")...)
 
-	return b.Bytes()
+	return b
+}
+
+func (w *Output) quote(b []byte) []byte {
+	return []byte(strconv.Quote(string(b)))
+}
+
+func (w *Output) autoQuote(b []byte) []byte {
+	if w.quotable(b) {
+		return w.quote(b)
+	}
+
+	return b
+}
+
+func (w *Output) quotable(b []byte) bool {
+	if _, err := jsonparser.ParseInt(b); err == nil {
+		return false
+	}
+
+	if _, err := jsonparser.ParseFloat(b); err == nil {
+		return false
+	}
+
+	if _, err := jsonparser.ParseBoolean(b); err == nil {
+		return false
+	}
+
+	return true
 }

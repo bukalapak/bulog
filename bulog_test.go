@@ -3,31 +3,51 @@ package bulog_test
 import (
 	"bytes"
 	"log"
+	"strings"
 	"testing"
 
 	"github.com/bukalapak/bulog"
 )
 
-func TestWriter(t *testing.T) {
-	b := new(bytes.Buffer)
-	w := &bulog.Output{
-		Levels:   []string{"TRACE", "DEBUG", "INFO", "WARN", "ERROR"},
-		MinLevel: "INFO",
-		Writer:   b,
+func TestOutput(t *testing.T) {
+	m := map[string][][]string{
+		"AutoLevel": [][]string{
+			[]string{"info", "[INFO] info"},
+			[]string{"[INFO] info", "[INFO] info"},
+		},
+		"NormalizeLevel": [][]string{
+			[]string{"[warn] warning", "[WARN] warning"},
+			[]string{"[WARN] warning", "[WARN] warning"},
+		},
+		"SkipLevel": [][]string{
+			[]string{"[INFO] info", "[DEBUG] debug"},
+			[]string{"[INFO] info"},
+		},
 	}
 
-	l := log.New(w, "", 0)
-	l.Println("info")
-	l.Println("[TRACE] trace")
-	l.Println("[DEBUG] debug")
-	l.Println("[INFO] info")
-	l.Println("[warn] warning")
-	l.Println("[ERROR] error")
+	for k, v := range m {
+		t.Run(k, func(t *testing.T) {
+			w := newOutput()
+			l := log.New(w, "", 0)
 
-	s := b.String()
-	x := "[INFO] info\n[INFO] info\n[WARN] warning\n[ERROR] error\n"
+			for i := range v[0] {
+				l.Println(v[0][i])
+			}
 
-	if s != x {
-		t.Fatalf("\nactual: %s\nexpected: %s", s, x)
+			s := w.Writer.(*bytes.Buffer).String()
+			x := strings.Join(v[1], "\n") + "\n"
+
+			if s != x {
+				t.Fatalf("\nactual: %s\nexpected: %s", s, x)
+			}
+		})
+	}
+}
+
+func newOutput() *bulog.Output {
+	return &bulog.Output{
+		Levels:   []string{"TRACE", "DEBUG", "INFO", "WARN", "ERROR"},
+		MinLevel: "INFO",
+		Writer:   new(bytes.Buffer),
 	}
 }

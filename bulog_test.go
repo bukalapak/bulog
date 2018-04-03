@@ -63,6 +63,10 @@ func TestOutput_Fmt(t *testing.T) {
 			[]string{`[INFO] foo="bar" num=8 msg="info"`},
 			[]string{`level=INFO foo="bar" num=8 msg="info"`},
 		},
+		"SpaceMetadata": [][]string{
+			[]string{`[INFO] foo="bar baz" info`},
+			[]string{`level=INFO foo="bar baz" msg="info"`},
+		},
 	}
 
 	for k, v := range m {
@@ -98,6 +102,10 @@ func TestOutput_JSON(t *testing.T) {
 		"MsgMetadata": [][]string{
 			[]string{`[INFO] foo="bar" num=8 msg="info"`},
 			[]string{`{"level":"INFO","foo":"bar","num":8,"msg":"info"}`},
+		},
+		"SpaceMetadata": [][]string{
+			[]string{`[INFO] foo="bar baz" info`},
+			[]string{`{"level":"INFO","foo":"bar baz","msg":"info"}`},
 		},
 	}
 

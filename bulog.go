@@ -42,15 +42,15 @@ func (w *Output) Write(line []byte) (n int, err error) {
 func (w *Output) init() {
 	levels := make(map[string]struct{})
 	for _, l := range w.Levels {
-		if strings.EqualFold(string(l), string(w.MinLevel)) {
+		if strings.EqualFold(l, w.MinLevel) {
 			break
 		}
 
-		levels[strings.ToUpper(string(l))] = struct{}{}
+		levels[strings.ToUpper(l)] = struct{}{}
 	}
 
 	w.skipLevels = levels
-	w.pattern = regexp.MustCompile(`(?P<key>\w+)=(?P<value>[^\s]+)`)
+	w.pattern = regexp.MustCompile(`(?P<key>\w+)=(?P<value>"[\w\s]+?"|[^\s]+)`)
 }
 
 func (w *Output) extractLine(line []byte) (string, []byte) {

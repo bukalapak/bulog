@@ -115,15 +115,24 @@ func (w *Output) formatLineFmt(level string, line []byte) []byte {
 	b := new(bytes.Buffer)
 	b.WriteString("level=" + level)
 
+	var hasMsg bool
+
 	if w.pattern.Match(line) {
 		for _, submatches := range w.pattern.FindAllSubmatch(line, -1) {
 			b.WriteString(" ")
 			b.Write(submatches[0])
+
+			if bytes.Equal(submatches[1], []byte("msg")) {
+				hasMsg = true
+			}
 		}
 	}
 
-	b.WriteString(" ")
-	b.Write(strconv.AppendQuote([]byte(`msg=`), string(w.extractMessage(line))))
+	if !hasMsg {
+		b.WriteString(" ")
+		b.Write(strconv.AppendQuote([]byte(`msg=`), string(w.extractMessage(line))))
+	}
+
 	b.WriteString("\n")
 
 	return b.Bytes()
@@ -133,15 +142,20 @@ func (w *Output) formatLineJSON(level string, line []byte) []byte {
 	b := new(bytes.Buffer)
 	b.WriteRune('{')
 	b.Write(strconv.AppendQuote([]byte(`"level":`), level))
-	b.WriteString(",")
-	b.Write(strconv.AppendQuote([]byte(`"msg":`), string(w.extractMessage(line))))
+
+	var hasMsg bool
 
 	if w.pattern.Match(line) {
 		z := [][]byte{}
 		p := []byte(`"$key":$value`)
 
 		for _, submatches := range w.pattern.FindAllSubmatchIndex(line, -1) {
-			z = append(z, w.pattern.Expand(nil, p, line, submatches))
+			c := w.pattern.Expand(nil, p, line, submatches)
+			z = append(z, c)
+
+			if bytes.Contains(c, []byte(`"msg":`)) {
+				hasMsg = true
+			}
 		}
 
 		if len(z) != 0 {
@@ -149,6 +163,11 @@ func (w *Output) formatLineJSON(level string, line []byte) []byte {
 		}
 
 		b.Write(bytes.Join(z, []byte(",")))
+	}
+
+	if !hasMsg {
+		b.WriteString(",")
+		b.Write(strconv.AppendQuote([]byte(`"msg":`), string(w.extractMessage(line))))
 	}
 
 	b.WriteRune('}')

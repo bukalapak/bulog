@@ -54,7 +54,7 @@ func (w *Output) init() {
 }
 
 func (w *Output) extractLine(line []byte) (string, []byte) {
-	level := extractLevel(line)
+	level := w.extractLevel(line)
 
 	if level != "" {
 		return level, line[(len(level) + 3):]
@@ -63,7 +63,7 @@ func (w *Output) extractLine(line []byte) (string, []byte) {
 	return w.MinLevel, line
 }
 
-func extractLevel(line []byte) (level string) {
+func (w *Output) extractLevel(line []byte) (level string) {
 	x := bytes.IndexByte(line, '[')
 	if x >= 0 {
 		y := bytes.IndexByte(line[x:], ']')

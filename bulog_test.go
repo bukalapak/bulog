@@ -2,7 +2,9 @@ package bulog_test
 
 import (
 	"bytes"
+	"encoding/json"
 	"log"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -126,7 +128,7 @@ func TestOutput_JSON(t *testing.T) {
 			s := w.Writer.(*bytes.Buffer).String()
 			x := strings.Join(v[1], "\n") + "\n"
 
-			if s != x {
+			if ok, _ := jsonEqual(s, x); !ok {
 				t.Fatalf("\nactual: %q\nexpected: %q", s, x)
 			}
 		})
@@ -139,4 +141,19 @@ func newOutput() *bulog.Output {
 		MinLevel: "INFO",
 		Writer:   new(bytes.Buffer),
 	}
+}
+
+func jsonEqual(s, x string) (bool, error) {
+	var is interface{}
+	var ix interface{}
+
+	if err := json.Unmarshal([]byte(s), &is); err != nil {
+		return false, err
+	}
+
+	if err := json.Unmarshal([]byte(x), &ix); err != nil {
+		return false, err
+	}
+
+	return reflect.DeepEqual(is, ix), nil
 }

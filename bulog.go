@@ -3,6 +3,7 @@ package bulog
 import (
 	"bytes"
 	"io"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -89,34 +90,26 @@ func (w *Output) formatLine(level string, line []byte) []byte {
 
 func (w *Output) formatLineNone(level string, line []byte) []byte {
 	b := new(bytes.Buffer)
-	d := logfmt.NewDecoder(bytes.NewReader(line))
 	c := logfmt.NewEncoder(b)
+	m := w.parseLine(line)
+	q := w.sort(m)
 
-	var hasMsg bool
-	var msg [][]byte
+	var msg []byte
 
-	for d.ScanRecord() {
-		for d.ScanKeyval() {
-			if d.Value() != nil {
-				if bytes.Equal(d.Key(), []byte("msg")) {
-					hasMsg = true
-				}
-
-				c.EncodeKeyval(d.Key(), d.Value())
-			} else {
-				msg = append(msg, d.Key())
-			}
+	for _, k := range q {
+		if k == "msg" {
+			msg = m[k]
+			continue
 		}
+
+		c.EncodeKeyval([]byte(k), m[k])
 	}
 
 	c.EndRecord()
 
-	z := []byte("[" + level + "] ")
 	x := bytes.TrimSpace(b.Bytes())
-
-	if !hasMsg {
-		z = append(z, bytes.Join(msg, []byte(" "))...)
-	}
+	z := []byte("[" + level + "] ")
+	z = append(z, msg...)
 
 	if len(x) != 0 {
 		z = append(z, []byte(" ")...)
@@ -130,29 +123,14 @@ func (w *Output) formatLineNone(level string, line []byte) []byte {
 
 func (w *Output) formatLineFmt(level string, line []byte) []byte {
 	b := new(bytes.Buffer)
-	d := logfmt.NewDecoder(bytes.NewReader(line))
+	m := w.parseLine(line)
+	q := w.sort(m)
+
 	c := logfmt.NewEncoder(b)
 	c.EncodeKeyval("level", level)
 
-	var hasMsg bool
-	var msg [][]byte
-
-	for d.ScanRecord() {
-		for d.ScanKeyval() {
-			if d.Value() != nil {
-				if bytes.Equal(d.Key(), []byte("msg")) {
-					hasMsg = true
-				}
-
-				c.EncodeKeyval(d.Key(), d.Value())
-			} else {
-				msg = append(msg, d.Key())
-			}
-		}
-	}
-
-	if !hasMsg {
-		c.EncodeKeyval("msg", bytes.Join(msg, []byte(" ")))
+	for _, k := range q {
+		c.EncodeKeyval([]byte(k), m[k])
 	}
 
 	c.EndRecord()
@@ -161,29 +139,11 @@ func (w *Output) formatLineFmt(level string, line []byte) []byte {
 }
 
 func (w *Output) formatLineJSON(level string, line []byte) []byte {
-	d := logfmt.NewDecoder(bytes.NewReader(line))
 	b := []byte("{}")
 	b, _ = jsonparser.Set(b, w.quote([]byte(level)), "level")
 
-	var hasMsg bool
-	var msg [][]byte
-
-	for d.ScanRecord() {
-		for d.ScanKeyval() {
-			if d.Value() != nil {
-				if bytes.Equal(d.Key(), []byte("msg")) {
-					hasMsg = true
-				}
-
-				b, _ = jsonparser.Set(b, w.autoQuote(d.Value()), string(d.Key()))
-			} else {
-				msg = append(msg, d.Key())
-			}
-		}
-	}
-
-	if !hasMsg {
-		b, _ = jsonparser.Set(b, w.quote(bytes.Join(msg, []byte(" "))), "msg")
+	for k, v := range w.parseLine(line) {
+		b, _ = jsonparser.Set(b, w.autoQuote(v), k)
 	}
 
 	b = append(b, []byte("\n")...)
@@ -217,4 +177,46 @@ func (w *Output) quotable(b []byte) bool {
 	}
 
 	return true
+}
+
+func (w *Output) parseLine(line []byte) map[string][]byte {
+	m := make(map[string][]byte)
+	d := logfmt.NewDecoder(bytes.NewReader(line))
+
+	var hasMsg bool
+	var msg [][]byte
+
+	for d.ScanRecord() {
+		for d.ScanKeyval() {
+			if d.Value() != nil {
+				if bytes.Equal(d.Key(), []byte("msg")) {
+					hasMsg = true
+				}
+
+				m[string(d.Key())] = d.Value()
+			} else {
+				msg = append(msg, d.Key())
+			}
+		}
+	}
+
+	if !hasMsg {
+		m["msg"] = bytes.Join(msg, []byte(" "))
+	}
+
+	return m
+}
+
+func (w *Output) sort(m map[string][]byte) []string {
+	q := make([]string, len(m))
+	i := 0
+
+	for k := range m {
+		q[i] = k
+		i++
+	}
+
+	sort.Strings(q)
+
+	return q
 }

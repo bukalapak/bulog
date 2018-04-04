@@ -59,15 +59,15 @@ func TestOutput_Fmt(t *testing.T) {
 		},
 		"Output": [][]string{
 			[]string{`[INFO] hello info num=8 foo="bar baz"`},
-			[]string{`level=INFO num=8 foo="bar baz" msg="hello info"`},
+			[]string{`level=INFO foo="bar baz" msg="hello info" num=8`},
 		},
 		"WithMetadata": [][]string{
 			[]string{`[INFO] info foo="bar" num=8`},
-			[]string{`level=INFO foo=bar num=8 msg=info`},
+			[]string{`level=INFO foo=bar msg=info num=8`},
 		},
 		"MsgMetadata": [][]string{
 			[]string{`[INFO] foo="bar" num=8 msg="info"`},
-			[]string{`level=INFO foo=bar num=8 msg=info`},
+			[]string{`level=INFO foo=bar msg=info num=8`},
 		},
 		"SpaceMetadata": [][]string{
 			[]string{`[INFO] foo="bar baz" info`},

@@ -3,6 +3,8 @@ package bulog_test
 import (
 	"bytes"
 	"encoding/json"
+	"io/ioutil"
+	"log"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -151,4 +153,38 @@ func jsonEqual(s, x string) (bool, error) {
 	}
 
 	return reflect.DeepEqual(is, ix), nil
+}
+
+func BenchmarkLogStd(b *testing.B) {
+	l := log.New(ioutil.Discard, "INFO: ", log.LstdFlags)
+
+	b.ReportAllocs()
+	for n := 0; n < b.N; n++ {
+		l.Println("hello")
+	}
+}
+
+func BenchmarkLogfmt(b *testing.B) {
+	out := bulog.New("INFO", []string{"TRACE", "DEBUG", "INFO", "WARN", "ERROR"})
+	out.Writer = ioutil.Discard
+
+	l := log.New(out, "", 0)
+
+	b.ReportAllocs()
+	for n := 0; n < b.N; n++ {
+		l.Println("hello")
+	}
+}
+
+func BenchmarkJSON(b *testing.B) {
+	out := bulog.New("INFO", []string{"TRACE", "DEBUG", "INFO", "WARN", "ERROR"})
+	out.Writer = ioutil.Discard
+	out.Format = bulog.JSON
+
+	l := log.New(out, "", 0)
+
+	b.ReportAllocs()
+	for n := 0; n < b.N; n++ {
+		l.Println("hello")
+	}
 }

@@ -15,52 +15,42 @@ import (
 var data = map[string][][]string{
 	"AutoLevel": {
 		{`info`, `[INFO] info`},
-		{`[INFO] info`, `[INFO] info`},
 		{`level=INFO msg=info`, `level=INFO msg=info`},
 		{`{"level":"INFO","msg":"info"}`, `{"level":"INFO","msg":"info"}`},
 	},
 	"NormalizeLevel": {
 		{`[warn] warning`, `[WARN] warning`},
-		{`[WARN] warning`, `[WARN] warning`},
 		{`level=WARN msg=warning`, `level=WARN msg=warning`},
 		{`{"level":"WARN","msg":"warning"}`, `{"level":"WARN","msg":"warning"}`},
 	},
 	"SkipLevel": {
 		{`[INFO] info`, `[DEBUG] debug`},
-		{`[INFO] info`},
 		{`level=INFO msg=info`},
 		{`{"level":"INFO","msg":"info"}`},
 	},
 	"WithMetadata": {
 		{`[INFO] info foo="bar" num=8 float=9.99 bool=true`},
-		{`[INFO] info bool=true float=9.99 foo=bar num=8`},
 		{`level=INFO bool=true float=9.99 foo=bar msg=info num=8`},
 		{`{"level":"INFO","msg":"info","foo":"bar","num":8,"float":9.99,"bool":true}`},
 	},
 	"MsgMetadata": {
 		{`[INFO] foo="bar" num=8 msg="info"`},
-		{`[INFO] info foo=bar num=8`},
 		{`level=INFO foo=bar msg=info num=8`},
 		{`{"level":"INFO","msg":"info","foo":"bar","num":8}`},
 	},
 	"SpaceMetadata": {
 		{`[INFO] foo="bar baz" info`},
-		{`[INFO] info foo="bar baz"`},
 		{`level=INFO foo="bar baz" msg=info`},
 		{`{"level":"INFO","msg":"info","foo":"bar baz"}`},
 	},
 }
 
-func TestOutput(t *testing.T) {
-	doTest(t, bulog.Basic, 1)
-}
-
 func TestOutput_Logfmt(t *testing.T) {
-	doTest(t, bulog.Logfmt, 2)
+	doTest(t, bulog.Logfmt, 1)
 }
 
 func TestOutput_JSON(t *testing.T) {
-	doTest(t, bulog.JSON, 3)
+	doTest(t, bulog.JSON, 2)
 }
 
 func doTest(t *testing.T, format bulog.Format, index int) {

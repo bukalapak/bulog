@@ -19,8 +19,7 @@ import (
 type Format int8
 
 const (
-	Basic Format = iota
-	Logfmt
+	Logfmt Format = iota
 	JSON
 )
 
@@ -46,7 +45,7 @@ func New(minLevel string, levels []string) *Output {
 	}
 }
 
-func NewLog(w *Output) *log.Logger {
+func NewLog(w io.Writer) *log.Logger {
 	return log.New(w, "", 0)
 }
 
@@ -87,46 +86,13 @@ func (w *Output) extractLine(line []byte) (string, []byte) {
 
 func (w *Output) formatLine(level string, line []byte) []byte {
 	switch w.Format {
-	case Logfmt:
-		return w.formatLineLogfmt(level, line)
 	case JSON:
 		return w.formatLineJSON(level, line)
+	case Logfmt:
+		fallthrough
+	default:
+		return w.formatLineLogfmt(level, line)
 	}
-
-	return w.formatLineBasic(level, line)
-}
-
-func (w *Output) formatLineBasic(level string, line []byte) []byte {
-	b := new(bytes.Buffer)
-	c := logfmt.NewEncoder(b)
-	m := w.parseLine(line)
-	q := sortStrings(m)
-
-	var msg []byte
-
-	for _, k := range q {
-		if k == "msg" {
-			msg = m[k]
-			continue
-		}
-
-		c.EncodeKeyval([]byte(k), m[k])
-	}
-
-	c.EndRecord()
-
-	x := bytes.TrimSpace(b.Bytes())
-	z := []byte("[" + level + "] ")
-	z = append(z, msg...)
-
-	if len(x) != 0 {
-		z = append(z, ' ')
-		z = append(z, x...)
-	}
-
-	z = append(z, '\n')
-
-	return z
 }
 
 func (w *Output) formatLineLogfmt(level string, line []byte) []byte {
@@ -168,7 +134,7 @@ func (w *Output) parseLine(line []byte) map[string][]byte {
 	}
 
 	if w.Stacktrace {
-		m["stacktrace"] = stacktrace(7)
+		m["stacktrace"] = stacktrace()
 	}
 
 	var hasMsg bool
@@ -237,23 +203,23 @@ func isQuotable(b []byte) bool {
 	return true
 }
 
-func stacktrace(calldepth int) []byte {
-	_, file, line, _ := runtime.Caller(calldepth)
+func stacktrace() []byte {
+	_, file, line, _ := runtime.Caller(7)
 	c := []byte(file)
 	c = append(c, ':')
 	c = append(c, []byte(strconv.Itoa(line))...)
 	return c
 }
 
-func extractLevel(line []byte) (level string) {
+func extractLevel(line []byte) string {
 	x := bytes.IndexByte(line, '[')
 	if x >= 0 {
 		y := bytes.IndexByte(line[x:], ']')
 
 		if y >= 0 {
-			level = string(bytes.ToUpper(line[x+1 : x+y]))
+			return string(bytes.ToUpper(line[x+1 : x+y]))
 		}
 	}
 
-	return
+	return ""
 }

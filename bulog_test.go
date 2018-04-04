@@ -4,9 +4,11 @@ import (
 	"bytes"
 	"encoding/json"
 	"log"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/bukalapak/bulog"
 )
@@ -94,12 +96,57 @@ func doTest(t *testing.T, format bulog.Format, index int) {
 	}
 }
 
-func newOutput() *bulog.Output {
-	return &bulog.Output{
-		Levels:   []string{"TRACE", "DEBUG", "INFO", "WARN", "ERROR"},
-		MinLevel: "INFO",
-		Writer:   new(bytes.Buffer),
+func TestOutput_timestamp(t *testing.T) {
+	w := newOutput()
+	w.Format = bulog.JSON
+	w.TimeFormat = time.RFC3339
+
+	l := log.New(w, "", 0)
+	l.Println("foo")
+
+	c := struct {
+		Timestamp time.Time `json:"timestamp"`
+	}{}
+
+	b := w.Writer.(*bytes.Buffer).Bytes()
+
+	json.Unmarshal(b, &c)
+
+	if c.Timestamp.IsZero() {
+		t.Fatal("bad time format")
 	}
+}
+
+func TestOutput_stacktrace(t *testing.T) {
+	w := newOutput()
+	w.Format = bulog.JSON
+	w.Stacktrace = true
+
+	l := log.New(w, "", 0)
+	l.Println("foo")
+
+	c := struct {
+		Stacktrace string `json:"stacktrace"`
+	}{}
+
+	b := w.Writer.(*bytes.Buffer).Bytes()
+
+	json.Unmarshal(b, &c)
+
+	s := strings.Split(c.Stacktrace, ":")
+
+	if f := filepath.Base(s[0]); f != "bulog_test.go" {
+		t.Fatal("bad stacktrace")
+	}
+}
+
+func newOutput() *bulog.Output {
+	out := bulog.New("INFO", []string{"TRACE", "DEBUG", "INFO", "WARN", "ERROR"})
+	out.Writer = new(bytes.Buffer)
+	out.Stacktrace = false
+	out.TimeFormat = ""
+
+	return out
 }
 
 func jsonEqual(s, x string) (bool, error) {

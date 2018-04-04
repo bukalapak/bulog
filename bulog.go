@@ -3,10 +3,13 @@ package bulog
 import (
 	"bytes"
 	"io"
+	"os"
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/buger/jsonparser"
 	"github.com/go-logfmt/logfmt"
@@ -25,8 +28,21 @@ type Output struct {
 	MinLevel   string
 	Format     Format
 	Writer     io.Writer
+	TimeFormat string
+	Stacktrace bool
 	skipLevels map[string]struct{}
 	once       sync.Once
+}
+
+func New(minLevel string, levels []string) *Output {
+	return &Output{
+		Levels:     levels,
+		MinLevel:   minLevel,
+		Writer:     os.Stderr,
+		Format:     Logfmt,
+		TimeFormat: time.RFC3339,
+		Stacktrace: true,
+	}
 }
 
 func (w *Output) Write(line []byte) (n int, err error) {
@@ -55,7 +71,7 @@ func (w *Output) init() {
 }
 
 func (w *Output) extractLine(line []byte) (string, []byte) {
-	level := w.extractLevel(line)
+	level := extractLevel(line)
 
 	if level != "" {
 		return level, line[(len(level) + 3):]
@@ -64,35 +80,22 @@ func (w *Output) extractLine(line []byte) (string, []byte) {
 	return w.MinLevel, line
 }
 
-func (w *Output) extractLevel(line []byte) (level string) {
-	x := bytes.IndexByte(line, '[')
-	if x >= 0 {
-		y := bytes.IndexByte(line[x:], ']')
-
-		if y >= 0 {
-			level = string(bytes.ToUpper(line[x+1 : x+y]))
-		}
-	}
-
-	return
-}
-
 func (w *Output) formatLine(level string, line []byte) []byte {
 	switch w.Format {
 	case Logfmt:
-		return w.formatLineFmt(level, line)
+		return w.formatLineLogfmt(level, line)
 	case JSON:
 		return w.formatLineJSON(level, line)
 	}
 
-	return w.formatLineNone(level, line)
+	return w.formatLineBasic(level, line)
 }
 
-func (w *Output) formatLineNone(level string, line []byte) []byte {
+func (w *Output) formatLineBasic(level string, line []byte) []byte {
 	b := new(bytes.Buffer)
 	c := logfmt.NewEncoder(b)
 	m := w.parseLine(line)
-	q := w.sort(m)
+	q := sortStrings(m)
 
 	var msg []byte
 
@@ -112,19 +115,19 @@ func (w *Output) formatLineNone(level string, line []byte) []byte {
 	z = append(z, msg...)
 
 	if len(x) != 0 {
-		z = append(z, []byte(" ")...)
+		z = append(z, ' ')
 		z = append(z, x...)
 	}
 
-	z = append(z, []byte("\n")...)
+	z = append(z, '\n')
 
 	return z
 }
 
-func (w *Output) formatLineFmt(level string, line []byte) []byte {
+func (w *Output) formatLineLogfmt(level string, line []byte) []byte {
 	b := new(bytes.Buffer)
 	m := w.parseLine(line)
-	q := w.sort(m)
+	q := sortStrings(m)
 
 	c := logfmt.NewEncoder(b)
 	c.EncodeKeyval("level", level)
@@ -140,48 +143,28 @@ func (w *Output) formatLineFmt(level string, line []byte) []byte {
 
 func (w *Output) formatLineJSON(level string, line []byte) []byte {
 	b := []byte("{}")
-	b, _ = jsonparser.Set(b, w.quote([]byte(level)), "level")
+	b, _ = jsonparser.Set(b, quote([]byte(level)), "level")
 
 	for k, v := range w.parseLine(line) {
-		b, _ = jsonparser.Set(b, w.autoQuote(v), k)
+		b, _ = jsonparser.Set(b, quotable(v), k)
 	}
 
-	b = append(b, []byte("\n")...)
+	b = append(b, '\n')
 
 	return b
-}
-
-func (w *Output) quote(b []byte) []byte {
-	return []byte(strconv.Quote(string(b)))
-}
-
-func (w *Output) autoQuote(b []byte) []byte {
-	if w.quotable(b) {
-		return w.quote(b)
-	}
-
-	return b
-}
-
-func (w *Output) quotable(b []byte) bool {
-	if _, err := jsonparser.ParseInt(b); err == nil {
-		return false
-	}
-
-	if _, err := jsonparser.ParseFloat(b); err == nil {
-		return false
-	}
-
-	if _, err := jsonparser.ParseBoolean(b); err == nil {
-		return false
-	}
-
-	return true
 }
 
 func (w *Output) parseLine(line []byte) map[string][]byte {
-	m := make(map[string][]byte)
 	d := logfmt.NewDecoder(bytes.NewReader(line))
+	m := make(map[string][]byte)
+
+	if w.TimeFormat != "" {
+		m["timestamp"] = []byte(time.Now().Format(w.TimeFormat))
+	}
+
+	if w.Stacktrace {
+		m["stacktrace"] = stacktrace(7)
+	}
 
 	var hasMsg bool
 	var msg [][]byte
@@ -207,7 +190,7 @@ func (w *Output) parseLine(line []byte) map[string][]byte {
 	return m
 }
 
-func (w *Output) sort(m map[string][]byte) []string {
+func sortStrings(m map[string][]byte) []string {
 	q := make([]string, len(m))
 	i := 0
 
@@ -219,4 +202,53 @@ func (w *Output) sort(m map[string][]byte) []string {
 	sort.Strings(q)
 
 	return q
+}
+
+func quote(b []byte) []byte {
+	return []byte(strconv.Quote(string(b)))
+}
+
+func quotable(b []byte) []byte {
+	if isQuotable(b) {
+		return quote(b)
+	}
+
+	return b
+}
+
+func isQuotable(b []byte) bool {
+	if _, err := jsonparser.ParseInt(b); err == nil {
+		return false
+	}
+
+	if _, err := jsonparser.ParseFloat(b); err == nil {
+		return false
+	}
+
+	if _, err := jsonparser.ParseBoolean(b); err == nil {
+		return false
+	}
+
+	return true
+}
+
+func stacktrace(calldepth int) []byte {
+	_, file, line, _ := runtime.Caller(calldepth)
+	c := []byte(file)
+	c = append(c, ':')
+	c = append(c, []byte(strconv.Itoa(line))...)
+	return c
+}
+
+func extractLevel(line []byte) (level string) {
+	x := bytes.IndexByte(line, '[')
+	if x >= 0 {
+		y := bytes.IndexByte(line[x:], ']')
+
+		if y >= 0 {
+			level = string(bytes.ToUpper(line[x+1 : x+y]))
+		}
+	}
+
+	return
 }

@@ -11,27 +11,47 @@ import (
 	"github.com/bukalapak/bulog"
 )
 
-func TestOutput(t *testing.T) {
-	m := map[string][][]string{
-		"AutoLevel": [][]string{
-			[]string{"info", "[INFO] info"},
-			[]string{"[INFO] info", "[INFO] info"},
-		},
-		"NormalizeLevel": [][]string{
-			[]string{"[warn] warning", "[WARN] warning"},
-			[]string{"[WARN] warning", "[WARN] warning"},
-		},
-		"SkipLevel": [][]string{
-			[]string{"[INFO] info", "[DEBUG] debug"},
-			[]string{"[INFO] info"},
-		},
-		"WithMetadata": [][]string{
-			[]string{`[INFO] info foo="bar" num=8`},
-			[]string{`[INFO] info foo=bar num=8`},
-		},
-	}
+var data = map[string][][]string{
+	"AutoLevel": [][]string{
+		[]string{`info`, `[INFO] info`},
+		[]string{`[INFO] info`, `[INFO] info`},
+		[]string{`level=INFO msg=info`, `level=INFO msg=info`},
+		[]string{`{"level":"INFO","msg":"info"}`, `{"level":"INFO","msg":"info"}`},
+	},
+	"NormalizeLevel": [][]string{
+		[]string{`[warn] warning`, `[WARN] warning`},
+		[]string{`[WARN] warning`, `[WARN] warning`},
+		[]string{`level=WARN msg=warning`, `level=WARN msg=warning`},
+		[]string{`{"level":"WARN","msg":"warning"}`, `{"level":"WARN","msg":"warning"}`},
+	},
+	"SkipLevel": [][]string{
+		[]string{`[INFO] info`, `[DEBUG] debug`},
+		[]string{`[INFO] info`},
+		[]string{`level=INFO msg=info`},
+		[]string{`{"level":"INFO","msg":"info"}`},
+	},
+	"WithMetadata": [][]string{
+		[]string{`[INFO] info foo="bar" num=8`},
+		[]string{`[INFO] info foo=bar num=8`},
+		[]string{`level=INFO foo=bar msg=info num=8`},
+		[]string{`{"level":"INFO","msg":"info","foo":"bar","num":8}`},
+	},
+	"MsgMetadata": [][]string{
+		[]string{`[INFO] foo="bar" num=8 msg="info"`},
+		[]string{`[INFO] info foo=bar num=8`},
+		[]string{`level=INFO foo=bar msg=info num=8`},
+		[]string{`{"level":"INFO","msg":"info","foo":"bar","num":8}`},
+	},
+	"SpaceMetadata": [][]string{
+		[]string{`[INFO] foo="bar baz" info`},
+		[]string{`[INFO] info foo="bar baz"`},
+		[]string{`level=INFO foo="bar baz" msg=info`},
+		[]string{`{"level":"INFO","msg":"info","foo":"bar baz"}`},
+	},
+}
 
-	for k, v := range m {
+func TestOutput(t *testing.T) {
+	for k, v := range data {
 		t.Run(k, func(t *testing.T) {
 			w := newOutput()
 			w.Format = bulog.Basic
@@ -45,37 +65,14 @@ func TestOutput(t *testing.T) {
 			x := strings.Join(v[1], "\n") + "\n"
 
 			if s != x {
-				t.Fatalf("\nactual: %q\nexpected: %q", s, x)
+				t.Fatalf("\nactual:   %q\nexpected: %q", s, x)
 			}
 		})
 	}
 }
 
-func TestOutput_Fmt(t *testing.T) {
-	m := map[string][][]string{
-		"SkipLevel": [][]string{
-			[]string{"[INFO] info", "[DEBUG] debug"},
-			[]string{`level=INFO msg=info`},
-		},
-		"Output": [][]string{
-			[]string{`[INFO] hello info num=8 foo="bar baz"`},
-			[]string{`level=INFO foo="bar baz" msg="hello info" num=8`},
-		},
-		"WithMetadata": [][]string{
-			[]string{`[INFO] info foo="bar" num=8`},
-			[]string{`level=INFO foo=bar msg=info num=8`},
-		},
-		"MsgMetadata": [][]string{
-			[]string{`[INFO] foo="bar" num=8 msg="info"`},
-			[]string{`level=INFO foo=bar msg=info num=8`},
-		},
-		"SpaceMetadata": [][]string{
-			[]string{`[INFO] foo="bar baz" info`},
-			[]string{`level=INFO foo="bar baz" msg=info`},
-		},
-	}
-
-	for k, v := range m {
+func TestOutput_Logfmt(t *testing.T) {
+	for k, v := range data {
 		t.Run(k, func(t *testing.T) {
 			w := newOutput()
 			w.Format = bulog.Logfmt
@@ -86,36 +83,17 @@ func TestOutput_Fmt(t *testing.T) {
 			}
 
 			s := w.Writer.(*bytes.Buffer).String()
-			x := strings.Join(v[1], "\n") + "\n"
+			x := strings.Join(v[2], "\n") + "\n"
 
 			if s != x {
-				t.Fatalf("\nactual: %q\nexpected: %q", s, x)
+				t.Fatalf("\nactual:   %q\nexpected: %q", s, x)
 			}
 		})
 	}
 }
 
 func TestOutput_JSON(t *testing.T) {
-	m := map[string][][]string{
-		"SkipLevel": [][]string{
-			[]string{"[INFO] info", "[DEBUG] debug"},
-			[]string{`{"level":"INFO","msg":"info"}`},
-		},
-		"WithMetadata": [][]string{
-			[]string{`[INFO] info foo="bar" num=8 float=9.99 bool=true`},
-			[]string{`{"level":"INFO","foo":"bar","num":8,"float":9.99,"bool":true,"msg":"info"}`},
-		},
-		"MsgMetadata": [][]string{
-			[]string{`[INFO] foo="bar" num=8 msg="info"`},
-			[]string{`{"level":"INFO","foo":"bar","num":8,"msg":"info"}`},
-		},
-		"SpaceMetadata": [][]string{
-			[]string{`[INFO] foo="bar baz" info`},
-			[]string{`{"level":"INFO","foo":"bar baz","msg":"info"}`},
-		},
-	}
-
-	for k, v := range m {
+	for k, v := range data {
 		t.Run(k, func(t *testing.T) {
 			w := newOutput()
 			w.Format = bulog.JSON
@@ -126,10 +104,15 @@ func TestOutput_JSON(t *testing.T) {
 			}
 
 			s := w.Writer.(*bytes.Buffer).String()
-			x := strings.Join(v[1], "\n") + "\n"
+			x := strings.Join(v[3], "\n") + "\n"
 
-			if ok, _ := jsonEqual(s, x); !ok {
-				t.Fatalf("\nactual: %q\nexpected: %q", s, x)
+			ss := strings.Split(strings.TrimSpace(s), "\n")
+			xx := strings.Split(strings.TrimSpace(x), "\n")
+
+			for i := range ss {
+				if ok, _ := jsonEqual(ss[i], xx[i]); !ok {
+					t.Fatalf("\nactual:   %q\nexpected: %q", s, x)
+				}
 			}
 		})
 	}

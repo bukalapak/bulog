@@ -3,6 +3,7 @@ package bulog
 import (
 	"bytes"
 	"io"
+	"log"
 	"os"
 	"runtime"
 	"sort"
@@ -43,6 +44,10 @@ func New(minLevel string, levels []string) *Output {
 		TimeFormat: time.RFC3339,
 		Stacktrace: true,
 	}
+}
+
+func NewLog(w *Output) *log.Logger {
+	return log.New(w, "", 0)
 }
 
 func (w *Output) Write(line []byte) (n int, err error) {

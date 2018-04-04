@@ -3,7 +3,6 @@ package bulog_test
 import (
 	"bytes"
 	"encoding/json"
-	"log"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -69,7 +68,7 @@ func doTest(t *testing.T, format bulog.Format, index int) {
 		t.Run(k, func(t *testing.T) {
 			w := newOutput()
 			w.Format = format
-			l := log.New(w, "", 0)
+			l := bulog.NewLog(w)
 
 			for i := range v[0] {
 				l.Println(v[0][i])
@@ -101,7 +100,7 @@ func TestOutput_timestamp(t *testing.T) {
 	w.Format = bulog.JSON
 	w.TimeFormat = time.RFC3339
 
-	l := log.New(w, "", 0)
+	l := bulog.NewLog(w)
 	l.Println("foo")
 
 	c := struct {
@@ -122,7 +121,7 @@ func TestOutput_stacktrace(t *testing.T) {
 	w.Format = bulog.JSON
 	w.Stacktrace = true
 
-	l := log.New(w, "", 0)
+	l := bulog.NewLog(w)
 	l.Println("foo")
 
 	c := struct {

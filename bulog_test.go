@@ -12,91 +12,61 @@ import (
 )
 
 var data = map[string][][]string{
-	"AutoLevel": [][]string{
-		[]string{`info`, `[INFO] info`},
-		[]string{`[INFO] info`, `[INFO] info`},
-		[]string{`level=INFO msg=info`, `level=INFO msg=info`},
-		[]string{`{"level":"INFO","msg":"info"}`, `{"level":"INFO","msg":"info"}`},
+	"AutoLevel": {
+		{`info`, `[INFO] info`},
+		{`[INFO] info`, `[INFO] info`},
+		{`level=INFO msg=info`, `level=INFO msg=info`},
+		{`{"level":"INFO","msg":"info"}`, `{"level":"INFO","msg":"info"}`},
 	},
-	"NormalizeLevel": [][]string{
-		[]string{`[warn] warning`, `[WARN] warning`},
-		[]string{`[WARN] warning`, `[WARN] warning`},
-		[]string{`level=WARN msg=warning`, `level=WARN msg=warning`},
-		[]string{`{"level":"WARN","msg":"warning"}`, `{"level":"WARN","msg":"warning"}`},
+	"NormalizeLevel": {
+		{`[warn] warning`, `[WARN] warning`},
+		{`[WARN] warning`, `[WARN] warning`},
+		{`level=WARN msg=warning`, `level=WARN msg=warning`},
+		{`{"level":"WARN","msg":"warning"}`, `{"level":"WARN","msg":"warning"}`},
 	},
-	"SkipLevel": [][]string{
-		[]string{`[INFO] info`, `[DEBUG] debug`},
-		[]string{`[INFO] info`},
-		[]string{`level=INFO msg=info`},
-		[]string{`{"level":"INFO","msg":"info"}`},
+	"SkipLevel": {
+		{`[INFO] info`, `[DEBUG] debug`},
+		{`[INFO] info`},
+		{`level=INFO msg=info`},
+		{`{"level":"INFO","msg":"info"}`},
 	},
-	"WithMetadata": [][]string{
-		[]string{`[INFO] info foo="bar" num=8`},
-		[]string{`[INFO] info foo=bar num=8`},
-		[]string{`level=INFO foo=bar msg=info num=8`},
-		[]string{`{"level":"INFO","msg":"info","foo":"bar","num":8}`},
+	"WithMetadata": {
+		{`[INFO] info foo="bar" num=8 float=9.99 bool=true`},
+		{`[INFO] info bool=true float=9.99 foo=bar num=8`},
+		{`level=INFO bool=true float=9.99 foo=bar msg=info num=8`},
+		{`{"level":"INFO","msg":"info","foo":"bar","num":8,"float":9.99,"bool":true}`},
 	},
-	"MsgMetadata": [][]string{
-		[]string{`[INFO] foo="bar" num=8 msg="info"`},
-		[]string{`[INFO] info foo=bar num=8`},
-		[]string{`level=INFO foo=bar msg=info num=8`},
-		[]string{`{"level":"INFO","msg":"info","foo":"bar","num":8}`},
+	"MsgMetadata": {
+		{`[INFO] foo="bar" num=8 msg="info"`},
+		{`[INFO] info foo=bar num=8`},
+		{`level=INFO foo=bar msg=info num=8`},
+		{`{"level":"INFO","msg":"info","foo":"bar","num":8}`},
 	},
-	"SpaceMetadata": [][]string{
-		[]string{`[INFO] foo="bar baz" info`},
-		[]string{`[INFO] info foo="bar baz"`},
-		[]string{`level=INFO foo="bar baz" msg=info`},
-		[]string{`{"level":"INFO","msg":"info","foo":"bar baz"}`},
+	"SpaceMetadata": {
+		{`[INFO] foo="bar baz" info`},
+		{`[INFO] info foo="bar baz"`},
+		{`level=INFO foo="bar baz" msg=info`},
+		{`{"level":"INFO","msg":"info","foo":"bar baz"}`},
 	},
 }
 
 func TestOutput(t *testing.T) {
-	for k, v := range data {
-		t.Run(k, func(t *testing.T) {
-			w := newOutput()
-			w.Format = bulog.Basic
-			l := log.New(w, "", 0)
-
-			for i := range v[0] {
-				l.Println(v[0][i])
-			}
-
-			s := w.Writer.(*bytes.Buffer).String()
-			x := strings.Join(v[1], "\n") + "\n"
-
-			if s != x {
-				t.Fatalf("\nactual:   %q\nexpected: %q", s, x)
-			}
-		})
-	}
+	doTest(t, bulog.Basic, 1)
 }
 
 func TestOutput_Logfmt(t *testing.T) {
-	for k, v := range data {
-		t.Run(k, func(t *testing.T) {
-			w := newOutput()
-			w.Format = bulog.Logfmt
-			l := log.New(w, "", 0)
-
-			for i := range v[0] {
-				l.Println(v[0][i])
-			}
-
-			s := w.Writer.(*bytes.Buffer).String()
-			x := strings.Join(v[2], "\n") + "\n"
-
-			if s != x {
-				t.Fatalf("\nactual:   %q\nexpected: %q", s, x)
-			}
-		})
-	}
+	doTest(t, bulog.Logfmt, 2)
 }
 
 func TestOutput_JSON(t *testing.T) {
+	doTest(t, bulog.JSON, 3)
+}
+
+func doTest(t *testing.T, format bulog.Format, index int) {
 	for k, v := range data {
 		t.Run(k, func(t *testing.T) {
 			w := newOutput()
-			w.Format = bulog.JSON
+			w.Format = format
 			l := log.New(w, "", 0)
 
 			for i := range v[0] {
@@ -104,13 +74,19 @@ func TestOutput_JSON(t *testing.T) {
 			}
 
 			s := w.Writer.(*bytes.Buffer).String()
-			x := strings.Join(v[3], "\n") + "\n"
+			x := strings.Join(v[index], "\n") + "\n"
 
-			ss := strings.Split(strings.TrimSpace(s), "\n")
-			xx := strings.Split(strings.TrimSpace(x), "\n")
+			if format == bulog.JSON {
+				ss := strings.Split(strings.TrimSpace(s), "\n")
+				xx := strings.Split(strings.TrimSpace(x), "\n")
 
-			for i := range ss {
-				if ok, _ := jsonEqual(ss[i], xx[i]); !ok {
+				for i := range ss {
+					if ok, _ := jsonEqual(ss[i], xx[i]); !ok {
+						t.Fatalf("\nactual:   %q\nexpected: %q", s, x)
+					}
+				}
+			} else {
+				if s != x {
 					t.Fatalf("\nactual:   %q\nexpected: %q", s, x)
 				}
 			}

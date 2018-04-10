@@ -29,7 +29,7 @@ type Output struct {
 	Format     Format
 	Writer     io.Writer
 	TimeFormat string
-	Stacktrace bool
+	ShowCaller bool
 	skipLevels map[string]struct{}
 	once       sync.Once
 }
@@ -41,7 +41,7 @@ func New(minLevel string, levels []string) *Output {
 		Writer:     os.Stderr,
 		Format:     Logfmt,
 		TimeFormat: time.RFC3339,
-		Stacktrace: true,
+		ShowCaller: true,
 	}
 }
 
@@ -133,8 +133,8 @@ func (w *Output) parseLine(line []byte) map[string][]byte {
 		m["timestamp"] = []byte(time.Now().Format(w.TimeFormat))
 	}
 
-	if w.Stacktrace {
-		m["stacktrace"] = stacktrace()
+	if w.ShowCaller {
+		m["caller"] = caller()
 	}
 
 	var hasMsg bool
@@ -203,7 +203,7 @@ func isQuotable(b []byte) bool {
 	return true
 }
 
-func stacktrace() []byte {
+func caller() []byte {
 	_, file, line, _ := runtime.Caller(7)
 	c := []byte(file)
 	c = append(c, ':')

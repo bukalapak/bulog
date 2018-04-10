@@ -24,14 +24,14 @@ w := bulog.New("INFO", []string{"DEBUG", "INFO", "WARN"})
 l := log.New(w, "", 0)
 l.Println("hello world!")
 
-// level=INFO msg="hello world!" stacktrace=/home/subosito/src/github.com/subosito/playground/main.go:13 timestamp=2018-04-04T11:08:51+07:00
+// level=INFO msg="hello world!" caller=/home/subosito/src/github.com/subosito/playground/main.go:13 timestamp=2018-04-04T11:08:51+07:00
 ```
 
-You can remove `stacktrace` and change timestamp format:
+You can remove `caller` and change timestamp format:
 
 ```go
 w:= bulog.New("INFO", []string{"DEBUG", "INFO", "WARN"})
-w.Stacktrace = false
+w.ShowCaller = false
 w.TimeFormat = time.RFC822
 
 l := log.New(w, "", 0)
@@ -44,7 +44,7 @@ Since we already defined log levels, let's use it:
 
 ```go
 w := bulog.New("INFO", []string{"DEBUG", "INFO", "WARN"})
-w.Stacktrace = false
+w.ShowCaller = false
 w.TimeFormat = time.RFC822
 
 l := log.New(w, "", 0)
@@ -62,7 +62,7 @@ Okay, let's produce JSON format so it can be consume by third-party tools:
 
 ```go
 w := bulog.New("INFO", []string{"DEBUG", "INFO", "WARN"})
-w.Stacktrace = false
+w.ShowCaller = false
 w.TimeFormat = time.RFC822
 w.Format = bulog.JSON
 
@@ -75,7 +75,7 @@ l.Println("[DEBUG] debug message")
 // {"level":"WARN","timestamp":"04 Apr 18 11:14 WIB","msg":"warning message"}
 ```
 
-Put stacktrace and default time format back, also use log helper:
+Put `caller` and default time format back, also use log helper:
 
 ```go
 w := bulog.New("INFO", []string{"DEBUG", "INFO", "WARN"})
@@ -86,8 +86,8 @@ l.Println("hello world!")
 l.Println("[WARN] warning message")
 l.Println("[DEBUG] debug message")
 
-// {"level":"INFO","timestamp":"2018-04-04T11:14:51+07:00","stacktrace":"/home/subosito/src/github.com/subosito/playground/main.go:14","msg":"hello world!"}
-// {"level":"WARN","msg":"warning message","timestamp":"2018-04-04T11:14:51+07:00","stacktrace":"/home/subosito/src/github.com/subosito/playground/main.go:15"}
+// {"level":"INFO","timestamp":"2018-04-04T11:14:51+07:00","caller":"/home/subosito/src/github.com/subosito/playground/main.go:14","msg":"hello world!"}
+// {"level":"WARN","msg":"warning message","timestamp":"2018-04-04T11:14:51+07:00","caller":"/home/subosito/src/github.com/subosito/playground/main.go:15"}
 ```
 
 That's it.

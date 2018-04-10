@@ -108,33 +108,33 @@ func TestOutput_timestamp(t *testing.T) {
 	}
 }
 
-func TestOutput_stacktrace(t *testing.T) {
+func TestOutput_caller(t *testing.T) {
 	w := newOutput()
 	w.Format = bulog.JSON
-	w.Stacktrace = true
+	w.ShowCaller = true
 
 	l := bulog.NewLog(w)
 	l.Println("foo")
 
 	c := struct {
-		Stacktrace string `json:"stacktrace"`
+		Caller string `json:"caller"`
 	}{}
 
 	b := w.Writer.(*bytes.Buffer).Bytes()
 
 	json.Unmarshal(b, &c)
 
-	s := strings.Split(c.Stacktrace, ":")
+	s := strings.Split(c.Caller, ":")
 
 	if f := filepath.Base(s[0]); f != "bulog_test.go" {
-		t.Fatal("bad stacktrace")
+		t.Fatal("bad caller")
 	}
 }
 
 func newOutput() *bulog.Output {
 	out := bulog.New("INFO", []string{"TRACE", "DEBUG", "INFO", "WARN", "ERROR"})
 	out.Writer = new(bytes.Buffer)
-	out.Stacktrace = false
+	out.ShowCaller = false
 	out.TimeFormat = ""
 
 	return out

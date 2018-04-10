@@ -24,14 +24,15 @@ w := bulog.New("INFO", []string{"DEBUG", "INFO", "WARN"})
 l := log.New(w, "", 0)
 l.Println("hello world!")
 
-// level=INFO msg="hello world!" caller=/home/subosito/src/github.com/subosito/playground/main.go:13 timestamp=2018-04-04T11:08:51+07:00
+// level=INFO msg="hello world!" caller=/home/subosito/src/github.com/subosito/playground/main.go:13 stacktrace="goroutine 1 [running]:\nruntime/debug.Stack(0x0, 0xc42001c100, 0xc420094000)\n\t/usr/lib/go/src/runtime/debug/stack.go:24 +0xa7\ngithub.com/bukalapak/bulog.stacktrace(0x4bcf60, 0xc4200741e0, 0x4d857a)\n\t/home/subosito/src/github.com/bukalapak/bulog/bulog.go:222 +0x22\ngithub.com/bukalapak/bulog.(*Output).parseLine(0xc420084000, 0xc420014170, 0xd, 0x10, 0x4acf479bbbef14b0)\n\t/home/subosito/src/github.com/bukalapak/bulog/bulog.go:144 +0x5a0\ngithub.com/bukalapak/bulog.(*Output).formatLineLogfmt(0xc420084000, 0x4d8279, 0x4, 0xc420014170, 0xd, 0x10, 0xc420088000, 0x0, 0x0)\n\t/home/subosito/src/github.com/bukalapak/bulog/bulog.go:103 +0x81\ngithub.com/bukalapak/bulog.(*Output).formatLine(0xc420084000, 0x4d8279, 0x4, 0xc420014170, 0xd, 0x10, 0xc420014170, 0xd, 0x10)\n\t/home/subosito/src/github.com/bukalapak/bulog/bulog.go:97 +0x6c\ngithub.com/bukalapak/bulog.(*Output).Write(0xc420084000, 0xc420014170, 0xd, 0x10, 0xd, 0xc420014170, 0x0)\n\t/home/subosito/src/github.com/bukalapak/bulog/bulog.go:64 +0x16d\nlog.(*Logger).Output(0xc420078140, 0x2, 0xc420014160, 0xd, 0x0, 0x0)\n\t/usr/lib/go/src/log/log.go:172 +0x1fd\nlog.(*Logger).Println(0xc420078140, 0xc420059f68, 0x1, 0x1)\n\t/usr/lib/go/src/log/log.go:188 +0x6a\nmain.main()\n\t/home/subosito/src/github.com/subosito/playground/main.go:13 +0x1c5\n" timestamp=2018-04-04T11:08:51+07:00
 ```
 
-You can remove `caller` and change timestamp format:
+You can remove `stacktrace` and `caller`, also change timestamp format:
 
 ```go
 w:= bulog.New("INFO", []string{"DEBUG", "INFO", "WARN"})
 w.ShowCaller = false
+w.Stacktrace = false
 w.TimeFormat = time.RFC822
 
 l := log.New(w, "", 0)
@@ -45,6 +46,7 @@ Since we already defined log levels, let's use it:
 ```go
 w := bulog.New("INFO", []string{"DEBUG", "INFO", "WARN"})
 w.ShowCaller = false
+w.Stacktrace = false
 w.TimeFormat = time.RFC822
 
 l := log.New(w, "", 0)
@@ -63,6 +65,7 @@ Okay, let's produce JSON format so it can be consume by third-party tools:
 ```go
 w := bulog.New("INFO", []string{"DEBUG", "INFO", "WARN"})
 w.ShowCaller = false
+w.Stacktrace = false
 w.TimeFormat = time.RFC822
 w.Format = bulog.JSON
 
@@ -79,6 +82,7 @@ Put `caller` and default time format back, also use log helper:
 
 ```go
 w := bulog.New("INFO", []string{"DEBUG", "INFO", "WARN"})
+w.Stacktrace = false
 w.Format = bulog.JSON
 
 l := bulog.NewLog(w)

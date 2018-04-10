@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"runtime"
+	"runtime/debug"
 	"sort"
 	"strconv"
 	"strings"
@@ -30,6 +31,7 @@ type Output struct {
 	Writer     io.Writer
 	TimeFormat string
 	ShowCaller bool
+	Stacktrace bool
 	skipLevels map[string]struct{}
 	once       sync.Once
 }
@@ -42,6 +44,7 @@ func New(minLevel string, levels []string) *Output {
 		Format:     Logfmt,
 		TimeFormat: time.RFC3339,
 		ShowCaller: true,
+		Stacktrace: true,
 	}
 }
 
@@ -137,6 +140,10 @@ func (w *Output) parseLine(line []byte) map[string][]byte {
 		m["caller"] = caller()
 	}
 
+	if w.Stacktrace {
+		m["stacktrace"] = stacktrace()
+	}
+
 	var hasMsg bool
 	var msg [][]byte
 
@@ -209,6 +216,10 @@ func caller() []byte {
 	c = append(c, ':')
 	c = append(c, []byte(strconv.Itoa(line))...)
 	return c
+}
+
+func stacktrace() []byte {
+	return debug.Stack()
 }
 
 func extractLevel(line []byte) string {

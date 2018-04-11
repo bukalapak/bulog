@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"log"
+	"os"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -149,6 +150,43 @@ func TestOutput_stacktrace(t *testing.T) {
 
 	if !strings.Contains(c.Stacktrace, "bulog_test.go") {
 		t.Fatal("bad stacktrace")
+	}
+}
+
+func TestOutput_log(t *testing.T) {
+	l := log.New(os.Stderr, "LOG: ", log.Ldate|log.Ltime|log.Lmicroseconds|log.Llongfile)
+	w := newOutput()
+	w.ShowCaller = true
+	w.TimeFormat = time.RFC3339
+	w.Format = bulog.JSON
+	w.Attach(l)
+
+	l.Println("[INFO] foo")
+
+	c := struct {
+		Msg       string    `json:"msg"`
+		Level     string    `json:"level"`
+		Caller    string    `json:"caller"`
+		Timestamp time.Time `json:"timestamp"`
+	}{}
+
+	b := w.Writer.(*bytes.Buffer).Bytes()
+	json.Unmarshal(b, &c)
+
+	if !strings.Contains(c.Caller, "bulog_test.go") {
+		t.Fatal("bad caller")
+	}
+
+	if c.Level != "INFO" {
+		t.Fatal("bad level")
+	}
+
+	if c.Timestamp.IsZero() {
+		t.Fatal("bad time parsing")
+	}
+
+	if c.Msg != "LOG: foo" {
+		t.Fatal("bad msg parsing")
 	}
 }
 

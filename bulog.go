@@ -32,6 +32,9 @@ type Output struct {
 	TimeFormat string
 	ShowCaller bool
 	Stacktrace bool
+
+	logPrefix  string
+	logFlags   int
 	skipLevels map[string]struct{}
 	once       sync.Once
 }
@@ -52,16 +55,22 @@ func NewLog(w io.Writer) *log.Logger {
 	return log.New(w, "", 0)
 }
 
+func (w *Output) Attach(g *log.Logger) {
+	w.logPrefix = g.Prefix()
+	w.logFlags = g.Flags()
+	g.SetOutput(w)
+}
+
 func (w *Output) Write(line []byte) (n int, err error) {
 	w.once.Do(w.init)
 
-	l, z := w.extractLine(line)
+	level := w.extractLevel(line)
 
-	if _, ok := w.skipLevels[l]; ok {
+	if _, ok := w.skipLevels[w.currentLevel(level)]; ok {
 		return len(line), nil
 	}
 
-	return w.Writer.Write(w.formatLine(l, z))
+	return w.Writer.Write(w.formatLine(level, line))
 }
 
 func (w *Output) init() {
@@ -77,14 +86,25 @@ func (w *Output) init() {
 	w.skipLevels = levels
 }
 
-func (w *Output) extractLine(line []byte) (string, []byte) {
-	level := extractLevel(line)
-
-	if level != "" {
-		return level, line[(len(level) + 3):]
+func (w *Output) currentLevel(level string) string {
+	if level == "" {
+		return w.MinLevel
 	}
 
-	return w.MinLevel, line
+	return level
+}
+
+func (w *Output) extractLevel(line []byte) string {
+	x := bytes.IndexByte(line, '[')
+	if x >= 0 {
+		y := bytes.IndexByte(line[x:], ']')
+
+		if y >= 0 {
+			return string(bytes.ToUpper(line[x+1 : x+y]))
+		}
+	}
+
+	return ""
 }
 
 func (w *Output) formatLine(level string, line []byte) []byte {
@@ -100,11 +120,11 @@ func (w *Output) formatLine(level string, line []byte) []byte {
 
 func (w *Output) formatLineLogfmt(level string, line []byte) []byte {
 	b := new(bytes.Buffer)
-	m := w.parseLine(line)
+	m := w.parseLine(level, line)
 	q := sortStrings(m)
-
+	l := w.currentLevel(level)
 	c := logfmt.NewEncoder(b)
-	c.EncodeKeyval("level", level)
+	c.EncodeKeyval("level", l)
 
 	for _, k := range q {
 		c.EncodeKeyval([]byte(k), m[k])
@@ -117,9 +137,11 @@ func (w *Output) formatLineLogfmt(level string, line []byte) []byte {
 
 func (w *Output) formatLineJSON(level string, line []byte) []byte {
 	b := []byte("{}")
-	b, _ = jsonparser.Set(b, quote([]byte(level)), "level")
+	l := w.currentLevel(level)
 
-	for k, v := range w.parseLine(line) {
+	b, _ = jsonparser.Set(b, quote([]byte(l)), "level")
+
+	for k, v := range w.parseLine(level, line) {
 		b, _ = jsonparser.Set(b, quotable(v), k)
 	}
 
@@ -128,20 +150,24 @@ func (w *Output) formatLineJSON(level string, line []byte) []byte {
 	return b
 }
 
-func (w *Output) parseLine(line []byte) map[string][]byte {
+func (w *Output) parseLine(level string, line []byte) map[string][]byte {
+	line = w.stripPrefix(line)
+	now, line := w.extractTimestamp(line)
+	caller, line := w.extractCaller(line)
+
 	d := logfmt.NewDecoder(bytes.NewReader(line))
 	m := make(map[string][]byte)
 
 	if w.TimeFormat != "" {
-		m["timestamp"] = []byte(time.Now().Format(w.TimeFormat))
+		m["timestamp"] = []byte(now.Format(w.TimeFormat))
 	}
 
 	if w.ShowCaller {
-		m["caller"] = caller()
+		m["caller"] = caller
 	}
 
 	if w.Stacktrace {
-		m["stacktrace"] = stacktrace()
+		m["stacktrace"] = debug.Stack()
 	}
 
 	var hasMsg bool
@@ -162,10 +188,76 @@ func (w *Output) parseLine(line []byte) map[string][]byte {
 	}
 
 	if !hasMsg {
-		m["msg"] = bytes.Join(msg, []byte(" "))
+		msg := bytes.Join(msg, []byte(" "))
+		if level != "" {
+			m["msg"] = msg[len(level)+3:]
+		} else {
+			m["msg"] = msg
+		}
+	}
+
+	if w.logPrefix != "" {
+		m["msg"] = append([]byte(w.logPrefix), m["msg"]...)
 	}
 
 	return m
+}
+
+func (w *Output) stripPrefix(line []byte) []byte {
+	if w.logPrefix != "" {
+		return line[len(w.logPrefix):]
+	}
+
+	return line
+}
+
+func (w *Output) extractTimestamp(line []byte) (time.Time, []byte) {
+	if w.logFlags&(log.Ldate|log.Ltime|log.Lmicroseconds) != 0 {
+		var n int
+		var layout string
+
+		if w.logFlags&log.Ldate != 0 {
+			n += 10
+			layout += "2006/01/02"
+		}
+
+		if w.logFlags&(log.Ltime|log.Lmicroseconds) != 0 {
+			if w.logFlags&log.Ldate != 0 {
+				n++
+				layout += " "
+			}
+
+			if w.logFlags&log.Ltime != 0 {
+				n += 8
+				layout += "15:04:05"
+			}
+
+			if w.logFlags&log.Lmicroseconds != 0 {
+				n += 6
+				layout += ".000000"
+			}
+
+			n++
+		}
+
+		n++
+
+		t, err := time.Parse(layout, string(line[:n-1]))
+		if err == nil {
+			return t, line[n:]
+		}
+	}
+
+	return time.Now(), line
+}
+
+func (w *Output) extractCaller(line []byte) ([]byte, []byte) {
+	if w.logFlags&(log.Lshortfile|log.Llongfile) != 0 {
+		b := bytes.SplitN(line, []byte(" "), 2)
+		return b[0][:len(b[0])-1], b[1]
+	}
+
+	return caller(), line
 }
 
 func sortStrings(m map[string][]byte) []string {
@@ -211,26 +303,9 @@ func isQuotable(b []byte) bool {
 }
 
 func caller() []byte {
-	_, file, line, _ := runtime.Caller(7)
+	_, file, line, _ := runtime.Caller(8)
 	c := []byte(file)
 	c = append(c, ':')
 	c = append(c, []byte(strconv.Itoa(line))...)
 	return c
-}
-
-func stacktrace() []byte {
-	return debug.Stack()
-}
-
-func extractLevel(line []byte) string {
-	x := bytes.IndexByte(line, '[')
-	if x >= 0 {
-		y := bytes.IndexByte(line[x:], ']')
-
-		if y >= 0 {
-			return string(bytes.ToUpper(line[x+1 : x+y]))
-		}
-	}
-
-	return ""
 }

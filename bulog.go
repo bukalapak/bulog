@@ -213,38 +213,29 @@ func (w *Output) stripPrefix(line []byte) []byte {
 
 func (w *Output) extractTimestamp(line []byte) (time.Time, []byte) {
 	if w.logFlags&(log.Ldate|log.Ltime|log.Lmicroseconds) != 0 {
-		var n int
 		var layout string
 
 		if w.logFlags&log.Ldate != 0 {
-			n += 10
 			layout += "2006/01/02"
 		}
 
 		if w.logFlags&(log.Ltime|log.Lmicroseconds) != 0 {
 			if w.logFlags&log.Ldate != 0 {
-				n++
 				layout += " "
 			}
 
-			if w.logFlags&log.Ltime != 0 {
-				n += 8
-				layout += "15:04:05"
-			}
+			layout += "15:04:05"
 
 			if w.logFlags&log.Lmicroseconds != 0 {
-				n += 6
 				layout += ".000000"
 			}
-
-			n++
 		}
 
-		n++
+		n := len(layout)
 
-		t, err := time.Parse(layout, string(line[:n-1]))
+		t, err := time.Parse(layout, string(line[:n]))
 		if err == nil {
-			return t, line[n:]
+			return t, line[n+1:]
 		}
 	}
 

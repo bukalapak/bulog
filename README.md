@@ -20,8 +20,8 @@ You can enhance it a bit using `bulog` (with `logfmt` format):
 
 ```go
 w := bulog.New("INFO", []string{"DEBUG", "INFO", "WARN"})
-w.LogFlags = log.Flags()
-w.LogPrefix = log.Prefix()
+w.SetFlags(log.Flags())
+w.SetPrefix(log.Prefix())
 
 log.SetOutput(w)
 log.Println("hello world!")

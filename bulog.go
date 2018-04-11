@@ -17,10 +17,14 @@ import (
 	"github.com/go-logfmt/logfmt"
 )
 
+// Format defines supported format by Output.
 type Format int8
 
 const (
+	// Logfmt sets format of the log messages as logfmt.
 	Logfmt Format = iota
+
+	// JSON sets format of the log messages as JSON.
 	JSON
 )
 
@@ -32,6 +36,7 @@ var defaultNames = map[string]string{
 	"stacktrace": "stacktrace",
 }
 
+// Output is an io.Writer that can be used with a logger to format and filter out log messages.
 type Output struct {
 	Levels     []string
 	MinLevel   string
@@ -41,12 +46,15 @@ type Output struct {
 	ShowCaller bool
 	Stacktrace bool
 	KeyNames   map[string]string
-	LogPrefix  string
-	LogFlags   int
+
 	skipLevels map[string]struct{}
 	once       sync.Once
+	mu         sync.Mutex
+	logPrefix  string
+	logFlags   int
 }
 
+// New creates a new Output. Output can be attaced to standard log.
 func New(minLevel string, levels []string) *Output {
 	return &Output{
 		Levels:     levels,
@@ -59,12 +67,30 @@ func New(minLevel string, levels []string) *Output {
 	}
 }
 
+// SetFlags copies the output flags for the logger.
+func (w *Output) SetFlags(flag int) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	w.logFlags = flag
+}
+
+// SetPrefix copies the output prefix for the logger.
+func (w *Output) SetPrefix(prefix string) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	w.logPrefix = prefix
+}
+
+// Attach copies flags and prefix, and also set *bulog.Output as the logger's output.
 func (w *Output) Attach(g *log.Logger) {
-	w.LogPrefix = g.Prefix()
-	w.LogFlags = g.Flags()
+	w.SetPrefix(g.Prefix())
+	w.SetFlags(g.Flags())
 	g.SetOutput(w)
 }
 
+// Write writes log line using preferred format.
 func (w *Output) Write(line []byte) (n int, err error) {
 	w.once.Do(w.init)
 
@@ -210,37 +236,37 @@ func (w *Output) parseLine(level string, line []byte) map[string][]byte {
 		}
 	}
 
-	if w.LogPrefix != "" {
-		m[msgKey] = append([]byte(w.LogPrefix), m[msgKey]...)
+	if w.logPrefix != "" {
+		m[msgKey] = append([]byte(w.logPrefix), m[msgKey]...)
 	}
 
 	return m
 }
 
 func (w *Output) stripPrefix(line []byte) []byte {
-	if w.LogPrefix != "" {
-		return line[len(w.LogPrefix):]
+	if w.logPrefix != "" {
+		return line[len(w.logPrefix):]
 	}
 
 	return line
 }
 
 func (w *Output) extractTimestamp(line []byte) (time.Time, []byte) {
-	if w.LogFlags&(log.Ldate|log.Ltime|log.Lmicroseconds) != 0 {
+	if w.logFlags&(log.Ldate|log.Ltime|log.Lmicroseconds) != 0 {
 		var layout string
 
-		if w.LogFlags&log.Ldate != 0 {
+		if w.logFlags&log.Ldate != 0 {
 			layout += "2006/01/02"
 		}
 
-		if w.LogFlags&(log.Ltime|log.Lmicroseconds) != 0 {
-			if w.LogFlags&log.Ldate != 0 {
+		if w.logFlags&(log.Ltime|log.Lmicroseconds) != 0 {
+			if w.logFlags&log.Ldate != 0 {
 				layout += " "
 			}
 
 			layout += "15:04:05"
 
-			if w.LogFlags&log.Lmicroseconds != 0 {
+			if w.logFlags&log.Lmicroseconds != 0 {
 				layout += ".000000"
 			}
 		}
@@ -257,7 +283,7 @@ func (w *Output) extractTimestamp(line []byte) (time.Time, []byte) {
 }
 
 func (w *Output) extractCaller(line []byte) ([]byte, []byte) {
-	if w.LogFlags&(log.Lshortfile|log.Llongfile) != 0 {
+	if w.logFlags&(log.Lshortfile|log.Llongfile) != 0 {
 		b := bytes.SplitN(line, []byte(" "), 2)
 		return b[0][:len(b[0])-1], b[1]
 	}

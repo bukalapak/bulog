@@ -62,7 +62,7 @@ func doTest(t *testing.T, format bulog.Format, index int) {
 		t.Run(k, func(t *testing.T) {
 			w := newOutput()
 			w.Format = format
-			l := bulog.NewLog(w)
+			l := log.New(w, "", 0)
 
 			for i := range v[0] {
 				l.Println(v[0][i])
@@ -94,7 +94,7 @@ func TestOutput_timestamp(t *testing.T) {
 	w.Format = bulog.JSON
 	w.TimeFormat = time.RFC3339
 
-	l := bulog.NewLog(w)
+	l := log.New(w, "", 0)
 	l.Println("foo")
 
 	c := struct {
@@ -115,7 +115,7 @@ func TestOutput_caller(t *testing.T) {
 	w.Format = bulog.JSON
 	w.ShowCaller = true
 
-	l := bulog.NewLog(w)
+	l := log.New(w, "", 0)
 	l.Println("foo")
 
 	c := struct {
@@ -138,7 +138,7 @@ func TestOutput_stacktrace(t *testing.T) {
 	w.Format = bulog.JSON
 	w.Stacktrace = true
 
-	l := bulog.NewLog(w)
+	l := log.New(w, "", 0)
 	l.Println("foo")
 
 	c := struct {

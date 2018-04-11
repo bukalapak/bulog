@@ -59,10 +59,6 @@ func New(minLevel string, levels []string) *Output {
 	}
 }
 
-func NewLog(w io.Writer) *log.Logger {
-	return log.New(w, "", 0)
-}
-
 func (w *Output) Attach(g *log.Logger) {
 	w.LogPrefix = g.Prefix()
 	w.LogFlags = g.Flags()

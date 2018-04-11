@@ -106,7 +106,7 @@ w := bulog.New("INFO", []string{"DEBUG", "INFO", "WARN"})
 w.Stacktrace = false
 w.Format = bulog.JSON
 w.KeyNames = map[string]string{
-	"level": 	 "severity",
+	"level":     "severity",
 	"timestamp": "@timestamp",
 }
 w.Attach(l)

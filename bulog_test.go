@@ -98,7 +98,7 @@ func TestOutput_timestamp(t *testing.T) {
 	l.Println("foo")
 
 	c := struct {
-		Timestamp time.Time `json:"timestamp"`
+		Timestamp time.Time `json:"@timestamp"`
 	}{}
 
 	b := w.Writer.(*bytes.Buffer).Bytes()
@@ -180,7 +180,7 @@ func TestOutput_log(t *testing.T) {
 				Msg       string    `json:"msg"`
 				Level     string    `json:"level"`
 				Caller    string    `json:"caller"`
-				Timestamp time.Time `json:"timestamp"`
+				Timestamp time.Time `json:"@timestamp"`
 			}{}
 
 			b := w.Writer.(*bytes.Buffer).Bytes()
@@ -211,6 +211,9 @@ func newOutput() *bulog.Output {
 	out.ShowCaller = false
 	out.Stacktrace = false
 	out.TimeFormat = ""
+	out.KeyNames = map[string]string{
+		"timestamp": "@timestamp",
+	}
 
 	return out
 }

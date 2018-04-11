@@ -24,6 +24,14 @@ const (
 	JSON
 )
 
+var defaultNames = map[string]string{
+	"level":      "level",
+	"msg":        "msg",
+	"timestamp":  "timestamp",
+	"caller":     "caller",
+	"stacktrace": "stacktrace",
+}
+
 type Output struct {
 	Levels     []string
 	MinLevel   string
@@ -32,6 +40,7 @@ type Output struct {
 	TimeFormat string
 	ShowCaller bool
 	Stacktrace bool
+	KeyNames   map[string]string
 
 	logPrefix  string
 	logFlags   int
@@ -107,6 +116,14 @@ func (w *Output) extractLevel(line []byte) string {
 	return ""
 }
 
+func (w *Output) key(s string) string {
+	if v := w.KeyNames[s]; v != "" {
+		return v
+	}
+
+	return defaultNames[s]
+}
+
 func (w *Output) formatLine(level string, line []byte) []byte {
 	switch w.Format {
 	case JSON:
@@ -139,7 +156,7 @@ func (w *Output) formatLineJSON(level string, line []byte) []byte {
 	b := []byte("{}")
 	l := w.currentLevel(level)
 
-	b, _ = jsonparser.Set(b, quote([]byte(l)), "level")
+	b, _ = jsonparser.Set(b, quote([]byte(l)), w.key("level"))
 
 	for k, v := range w.parseLine(level, line) {
 		b, _ = jsonparser.Set(b, quotable(v), k)
@@ -159,24 +176,26 @@ func (w *Output) parseLine(level string, line []byte) map[string][]byte {
 	m := make(map[string][]byte)
 
 	if w.TimeFormat != "" {
-		m["timestamp"] = []byte(now.Format(w.TimeFormat))
+		m[w.key("timestamp")] = []byte(now.Format(w.TimeFormat))
 	}
 
 	if w.ShowCaller {
-		m["caller"] = caller
+		m[w.key("caller")] = caller
 	}
 
 	if w.Stacktrace {
-		m["stacktrace"] = debug.Stack()
+		m[w.key("stacktrace")] = debug.Stack()
 	}
 
 	var hasMsg bool
 	var msg [][]byte
 
+	msgKey := w.key("msg")
+
 	for d.ScanRecord() {
 		for d.ScanKeyval() {
 			if d.Value() != nil {
-				if bytes.Equal(d.Key(), []byte("msg")) {
+				if bytes.Equal(d.Key(), []byte(msgKey)) {
 					hasMsg = true
 				}
 
@@ -190,14 +209,14 @@ func (w *Output) parseLine(level string, line []byte) map[string][]byte {
 	if !hasMsg {
 		msg := bytes.Join(msg, []byte(" "))
 		if level != "" {
-			m["msg"] = msg[len(level)+3:]
+			m[msgKey] = msg[len(level)+3:]
 		} else {
-			m["msg"] = msg
+			m[msgKey] = msg
 		}
 	}
 
 	if w.logPrefix != "" {
-		m["msg"] = append([]byte(w.logPrefix), m["msg"]...)
+		m[msgKey] = append([]byte(w.logPrefix), m[msgKey]...)
 	}
 
 	return m

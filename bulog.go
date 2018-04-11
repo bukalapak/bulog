@@ -41,9 +41,8 @@ type Output struct {
 	ShowCaller bool
 	Stacktrace bool
 	KeyNames   map[string]string
-
-	logPrefix  string
-	logFlags   int
+	LogPrefix  string
+	LogFlags   int
 	skipLevels map[string]struct{}
 	once       sync.Once
 }
@@ -65,8 +64,8 @@ func NewLog(w io.Writer) *log.Logger {
 }
 
 func (w *Output) Attach(g *log.Logger) {
-	w.logPrefix = g.Prefix()
-	w.logFlags = g.Flags()
+	w.LogPrefix = g.Prefix()
+	w.LogFlags = g.Flags()
 	g.SetOutput(w)
 }
 
@@ -215,37 +214,37 @@ func (w *Output) parseLine(level string, line []byte) map[string][]byte {
 		}
 	}
 
-	if w.logPrefix != "" {
-		m[msgKey] = append([]byte(w.logPrefix), m[msgKey]...)
+	if w.LogPrefix != "" {
+		m[msgKey] = append([]byte(w.LogPrefix), m[msgKey]...)
 	}
 
 	return m
 }
 
 func (w *Output) stripPrefix(line []byte) []byte {
-	if w.logPrefix != "" {
-		return line[len(w.logPrefix):]
+	if w.LogPrefix != "" {
+		return line[len(w.LogPrefix):]
 	}
 
 	return line
 }
 
 func (w *Output) extractTimestamp(line []byte) (time.Time, []byte) {
-	if w.logFlags&(log.Ldate|log.Ltime|log.Lmicroseconds) != 0 {
+	if w.LogFlags&(log.Ldate|log.Ltime|log.Lmicroseconds) != 0 {
 		var layout string
 
-		if w.logFlags&log.Ldate != 0 {
+		if w.LogFlags&log.Ldate != 0 {
 			layout += "2006/01/02"
 		}
 
-		if w.logFlags&(log.Ltime|log.Lmicroseconds) != 0 {
-			if w.logFlags&log.Ldate != 0 {
+		if w.LogFlags&(log.Ltime|log.Lmicroseconds) != 0 {
+			if w.LogFlags&log.Ldate != 0 {
 				layout += " "
 			}
 
 			layout += "15:04:05"
 
-			if w.logFlags&log.Lmicroseconds != 0 {
+			if w.LogFlags&log.Lmicroseconds != 0 {
 				layout += ".000000"
 			}
 		}
@@ -262,7 +261,7 @@ func (w *Output) extractTimestamp(line []byte) (time.Time, []byte) {
 }
 
 func (w *Output) extractCaller(line []byte) ([]byte, []byte) {
-	if w.logFlags&(log.Lshortfile|log.Llongfile) != 0 {
+	if w.LogFlags&(log.Lshortfile|log.Llongfile) != 0 {
 		b := bytes.SplitN(line, []byte(" "), 2)
 		return b[0][:len(b[0])-1], b[1]
 	}

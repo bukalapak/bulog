@@ -3,6 +3,7 @@
 [![Build Status](https://travis-ci.org/bukalapak/bulog.svg?branch=master)](https://travis-ci.org/bukalapak/bulog)
 [![codecov](https://codecov.io/gh/bukalapak/bulog/branch/master/graph/badge.svg)](https://codecov.io/gh/bukalapak/bulog)
 [![GoDoc](https://godoc.org/github.com/bukalapak/bulog?status.svg)](https://godoc.org/github.com/bukalapak/bulog)
+[![Go Report Card](https://goreportcard.com/badge/github.com/bukalapak/bulog)](https://goreportcard.com/report/github.com/bukalapak/bulog)
 
 An alternative output destination for the standard library log package
 

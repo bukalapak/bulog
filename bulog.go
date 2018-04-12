@@ -54,7 +54,7 @@ type Output struct {
 	logFlags   int
 }
 
-// New creates a new Output. Output can be attaced to standard log.
+// New creates a new Output. Output can be attached to standard log.
 func New(minLevel string, levels []string) *Output {
 	return &Output{
 		Levels:     levels,

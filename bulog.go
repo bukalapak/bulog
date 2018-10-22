@@ -15,7 +15,12 @@ import (
 
 	"github.com/buger/jsonparser"
 	"github.com/go-logfmt/logfmt"
+	"github.com/rs/zerolog"
 )
+
+func init() {
+	zerolog.TimestampFieldName = "@timestamp"
+}
 
 // Format defines supported format by Output.
 type Format int8
@@ -339,4 +344,64 @@ func caller() []byte {
 	c = append(c, ':')
 	c = append(c, []byte(strconv.Itoa(line))...)
 	return c
+}
+
+var mapLevel = map[string]zerolog.Level{
+	"debug": zerolog.DebugLevel,
+	"info":  zerolog.InfoLevel,
+	"warn":  zerolog.WarnLevel,
+	"error": zerolog.ErrorLevel,
+	"fatal": zerolog.FatalLevel,
+	"panic": zerolog.PanicLevel,
+}
+
+type standard struct {
+	logger zerolog.Logger
+}
+
+func (d *standard) Write(b []byte) (n int, err error) {
+	for k, v := range mapLevel {
+		if _hasPrefix(b, k) {
+			d.logger.WithLevel(v).Msg(string(_trimLevel(k, b)))
+			return
+		}
+	}
+
+	d.logger.WithLevel(zerolog.NoLevel).Msg(string(_trim(b)))
+	return
+}
+
+func _trim(b []byte) []byte {
+	n := len(b)
+
+	if n > 0 && b[n-1] == '\n' {
+		b = b[0 : n-1] // trim stdlog CR
+	}
+
+	return b
+}
+
+func _trimLevel(lvl string, b []byte) []byte {
+	b = _trim(b)
+	b = bytes.TrimPrefix(b, []byte("["+lvl+"] "))
+	b = bytes.TrimPrefix(b, []byte("["+strings.ToUpper(lvl)+"] "))
+
+	return b
+}
+
+func _hasPrefix(b []byte, lvl string) bool {
+	return bytes.HasPrefix(b, []byte("["+lvl+"]")) || bytes.HasPrefix(b, []byte("["+strings.ToUpper(lvl)+"]"))
+}
+
+func newStandard(out io.Writer) *standard {
+	return &standard{
+		logger: zerolog.New(out).With().Timestamp().Caller().Logger(),
+	}
+}
+
+func Standard(out io.Writer) *log.Logger {
+	w := newStandard(out)
+	l := log.New(w, "", 0)
+
+	return l
 }

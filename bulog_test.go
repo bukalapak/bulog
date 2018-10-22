@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/bukalapak/bulog"
+	"github.com/stretchr/testify/assert"
 )
 
 var data = map[string][][]string{
@@ -264,5 +265,44 @@ func BenchmarkJSON(b *testing.B) {
 	b.ReportAllocs()
 	for n := 0; n < b.N; n++ {
 		l.Println("hello")
+	}
+}
+
+func TestStandard(t *testing.T) {
+	data := map[string][]string{
+		"Hello world!":        []string{"", "Hello world!"},
+		"[INFO] Hello world!": []string{"info", "Hello world!"},
+		"[WARN] Hello world!": []string{"warn", "Hello world!"},
+	}
+
+	for k, v := range data {
+		out := new(bytes.Buffer)
+
+		l := bulog.Standard(out)
+		l.Println(k)
+
+		z := struct {
+			Level     string    `json:"level"`
+			Timestamp time.Time `json:"@timestamp"`
+			Message   string    `json:"message"`
+		}{}
+
+		dec := json.NewDecoder(out)
+		err := dec.Decode(&z)
+		assert.Nil(t, err)
+
+		assert.Equal(t, v[0], z.Level)
+		assert.Equal(t, v[1], z.Message)
+		assert.False(t, z.Timestamp.IsZero())
+	}
+}
+
+func BenchmarkStandard(b *testing.B) {
+	out := new(bytes.Buffer)
+	l := bulog.Standard(out)
+
+	b.ReportAllocs()
+	for n := 0; n < b.N; n++ {
+		l.Println("[INFO] information")
 	}
 }

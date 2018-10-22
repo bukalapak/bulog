@@ -2,6 +2,7 @@ package bulog
 
 import (
 	"bytes"
+	"encoding/json"
 	"io"
 	"log"
 	"os"
@@ -393,14 +394,89 @@ func _hasPrefix(b []byte, lvl string) bool {
 	return bytes.HasPrefix(b, []byte("["+lvl+"]")) || bytes.HasPrefix(b, []byte("["+strings.ToUpper(lvl)+"]"))
 }
 
+func newLog(out io.Writer) zerolog.Logger {
+	return zerolog.New(out).With().Timestamp().Logger()
+}
+
 func newStandard(out io.Writer) *standard {
 	return &standard{
-		logger: zerolog.New(out).With().Timestamp().Caller().Logger(),
+		logger: newLog(out),
 	}
 }
 
 func Standard(out io.Writer) *log.Logger {
 	w := newStandard(out)
+	l := log.New(w, "", 0)
+
+	return l
+}
+
+type logFmt struct {
+	logger zerolog.Logger
+}
+
+func newLogFmt(out io.Writer) *logFmt {
+	return &logFmt{
+		logger: newLog(out),
+	}
+}
+
+func (m *logFmt) Write(b []byte) (n int, err error) {
+	dec := logfmt.NewDecoder(bytes.NewReader(b))
+
+	type kv struct {
+		k, v []byte
+	}
+
+	var kvs []kv
+
+	for dec.ScanRecord() {
+		for dec.ScanKeyval() {
+			k := dec.Key()
+			v := dec.Value()
+
+			if k != nil {
+				kvs = append(kvs, kv{k, v})
+			}
+		}
+	}
+
+	lvl := zerolog.NoLevel
+	msg := ""
+
+	// extract level
+	for i, x := range kvs {
+		if bytes.EqualFold(x.k, []byte("level")) {
+			lvl = mapLevel[string(x.v)]
+			kvs = append(kvs[:i], kvs[i+1:]...)
+		}
+	}
+
+	// extract msg
+	for i, x := range kvs {
+		if bytes.EqualFold(x.k, []byte("msg")) {
+			msg = string(x.v)
+			kvs = append(kvs[:i], kvs[i+1:]...)
+		}
+	}
+
+	event := m.logger.WithLevel(lvl)
+
+	for _, x := range kvs {
+		if json.Valid(x.v) {
+			event = event.RawJSON(string(x.k), x.v)
+		} else {
+			event = event.Bytes(string(x.k), x.v)
+		}
+	}
+
+	event.Msg(msg)
+
+	return
+}
+
+func LogFmt(out io.Writer) *log.Logger {
+	w := newLogFmt(out)
 	l := log.New(w, "", 0)
 
 	return l

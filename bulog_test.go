@@ -39,7 +39,7 @@ func TestStandard(t *testing.T) {
 	}
 }
 
-func TestLogFmt(t *testing.T) {
+func TestLogfmt(t *testing.T) {
 	data := map[string][]string{
 		`msg="Hello world!"`: []string{"", "Hello world!"},
 		`level=info int=200 text="OK" bool=true double=4.0 msg="Hello world!"`: []string{"info", "Hello world!"},
@@ -48,7 +48,7 @@ func TestLogFmt(t *testing.T) {
 	for k, v := range data {
 		out := new(bytes.Buffer)
 
-		l := bulog.LogFmt(out)
+		l := bulog.Logfmt(out)
 		l.Println(k)
 
 		z := struct {
@@ -88,9 +88,9 @@ func BenchmarkStandard(b *testing.B) {
 	}
 }
 
-func BenchmarkLogFmt(b *testing.B) {
+func BenchmarkLogfmt(b *testing.B) {
 	out := new(bytes.Buffer)
-	l := bulog.LogFmt(out)
+	l := bulog.Logfmt(out)
 
 	b.ReportAllocs()
 	for n := 0; n < b.N; n++ {

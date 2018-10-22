@@ -35,10 +35,10 @@ l.Println("[INFO] hello world!")
 // {"level":"info","@timestamp":"2018-10-22T21:04:27+07:00","message":"hello world!"}
 ```
 
-If you prefer writing log message using [logfmt](https://brandur.org/logfmt) format, bulog provides the support via `bulog.LogFmt`:
+If you prefer writing log message using [logfmt](https://brandur.org/logfmt) format, bulog provides the support via `bulog.Logfmt`:
 
 ```go
-l := bulog.LogFmt(os.Stdout)
+l := bulog.Logfmt(os.Stdout)
 l.Println(`level="info" code=200 msg="hello world!"`)
 
 // {"level":"info","code":200,"@timestamp":"2018-10-22T21:07:45+07:00","message":"hello world!"}

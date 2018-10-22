@@ -68,7 +68,7 @@ type logFmt struct {
 	logger zerolog.Logger
 }
 
-func newLogFmt(out io.Writer) *logFmt {
+func newLogfmt(out io.Writer) *logFmt {
 	return &logFmt{
 		logger: newLog(out),
 	}
@@ -128,8 +128,8 @@ func (m *logFmt) Write(b []byte) (n int, err error) {
 	return
 }
 
-func LogFmt(out io.Writer) *log.Logger {
-	w := newLogFmt(out)
+func Logfmt(out io.Writer) *log.Logger {
+	w := newLogfmt(out)
 	l := log.New(w, "", 0)
 
 	return l

@@ -360,34 +360,24 @@ type standard struct {
 	logger zerolog.Logger
 }
 
-func (d *standard) Write(b []byte) (n int, err error) {
-	for k, v := range mapLevel {
-		if _hasPrefix(b, k) {
-			d.logger.WithLevel(v).Msg(string(_trimLevel(k, b)))
-			return
-		}
-	}
-
-	d.logger.WithLevel(zerolog.NoLevel).Msg(string(_trim(b)))
-	return
-}
-
-func _trim(b []byte) []byte {
+func (d *standard) Write(b []byte) (c int, err error) {
 	n := len(b)
 
 	if n > 0 && b[n-1] == '\n' {
 		b = b[0 : n-1] // trim stdlog CR
 	}
 
-	return b
-}
+	z := bytes.Index(b, []byte("] "))
 
-func _trimLevel(lvl string, b []byte) []byte {
-	b = _trim(b)
-	b = bytes.TrimPrefix(b, []byte("["+lvl+"] "))
-	b = bytes.TrimPrefix(b, []byte("["+strings.ToUpper(lvl)+"] "))
+	if z > 1 {
+		v := bytes.ToLower(b[1:z])
+		b = b[z+2:]
 
-	return b
+		d.logger.WithLevel(mapLevel[string(v)]).Msg(string(b))
+	}
+
+	d.logger.WithLevel(zerolog.NoLevel).Msg(string(b))
+	return
 }
 
 func _hasPrefix(b []byte, lvl string) bool {

@@ -3,6 +3,8 @@ package bulog_test
 import (
 	"bytes"
 	"encoding/json"
+	"io/ioutil"
+	"log"
 	"testing"
 	"time"
 
@@ -75,6 +77,15 @@ func TestLogfmt(t *testing.T) {
 			assert.Equal(t, true, z.Bool)
 			assert.Equal(t, "OK", z.Text)
 		}
+	}
+}
+
+func BenchmarkLogStd(b *testing.B) {
+	l := log.New(ioutil.Discard, "INFO: ", log.LstdFlags)
+
+	b.ReportAllocs()
+	for n := 0; n < b.N; n++ {
+		l.Println("information")
 	}
 }
 

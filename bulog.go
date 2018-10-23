@@ -47,31 +47,8 @@ func (d *standard) Write(b []byte) (c int, err error) {
 	return
 }
 
-func newLog(out io.Writer) zerolog.Logger {
-	return zerolog.New(out).With().Timestamp().Logger()
-}
-
-func newStandard(out io.Writer) *standard {
-	return &standard{
-		logger: newLog(out),
-	}
-}
-
-func Standard(out io.Writer) *log.Logger {
-	w := newStandard(out)
-	l := log.New(w, "", 0)
-
-	return l
-}
-
 type logFmt struct {
 	logger zerolog.Logger
-}
-
-func newLogfmt(out io.Writer) *logFmt {
-	return &logFmt{
-		logger: newLog(out),
-	}
 }
 
 func (m *logFmt) Write(b []byte) (n int, err error) {
@@ -128,9 +105,24 @@ func (m *logFmt) Write(b []byte) (n int, err error) {
 	return
 }
 
-func Logfmt(out io.Writer) *log.Logger {
-	w := newLogfmt(out)
-	l := log.New(w, "", 0)
+func _zerolog(out io.Writer) zerolog.Logger {
+	return zerolog.New(out).With().Timestamp().Logger()
+}
 
-	return l
+func Logfmt(out io.Writer) *log.Logger {
+	return LogfmtZero(_zerolog(out))
+}
+
+func Standard(out io.Writer) *log.Logger {
+	return StandardZero(_zerolog(out))
+}
+
+func StandardZero(logger zerolog.Logger) *log.Logger {
+	w := &standard{logger: logger}
+	return log.New(w, "", 0)
+}
+
+func LogfmtZero(logger zerolog.Logger) *log.Logger {
+	w := &logFmt{logger: logger}
+	return log.New(w, "", 0)
 }

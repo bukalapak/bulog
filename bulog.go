@@ -113,16 +113,16 @@ func Logfmt(out io.Writer) *log.Logger {
 	return LogfmtZero(_zerolog(out))
 }
 
+func LogfmtZero(logger zerolog.Logger) *log.Logger {
+	w := &logFmt{logger: logger}
+	return log.New(w, "", 0)
+}
+
 func Standard(out io.Writer) *log.Logger {
 	return StandardZero(_zerolog(out))
 }
 
 func StandardZero(logger zerolog.Logger) *log.Logger {
 	w := &standard{logger: logger}
-	return log.New(w, "", 0)
-}
-
-func LogfmtZero(logger zerolog.Logger) *log.Logger {
-	w := &logFmt{logger: logger}
 	return log.New(w, "", 0)
 }

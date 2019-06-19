@@ -1,5 +1,9 @@
 # Changelog
 
+## [1.2.0] - 2019-05-20
+
+Incorporating go modules
+
 ## [1.1.0] - 2018-10-23
 
 ### Added
